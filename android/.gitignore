@@ -1,0 +1,158 @@
+# =========================================================
+# Flutter / Dart
+# =========================================================
+
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+build/
+coverage/
+
+# Flutter generated files
+**/doc/api/
+**/ios/Flutter/.last_build_id
+
+# Generated plugin registrants
+**/GeneratedPluginRegistrant.*
+
+# =========================================================
+# Dart / General
+# =========================================================
+
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.history/
+.svn/
+.atom/
+.build/
+.swiftpm/
+migrate_working_dir/
+
+# =========================================================
+# Android Studio / IntelliJ
+# =========================================================
+
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# =========================================================
+# VS Code
+# =========================================================
+
+# Keep VS Code settings if you want them in GitHub
+# .vscode/
+
+# =========================================================
+# Android / Gradle
+# =========================================================
+
+.gradle/
+android/.gradle/
+android/build/
+android/app/debug/
+android/app/profile/
+android/app/release/
+
+# Gradle generated files
+**/gradle-wrapper.jar
+
+# Local Android SDK configuration
+android/local.properties
+
+# =========================================================
+# Android Signing / Secrets
+# =========================================================
+
+key.properties
+key.properties.txt
+
+*.jks
+*.keystore
+
+# =========================================================
+# Environment / API Secrets
+# =========================================================
+
+.env
+.env.*
+!.env.example
+
+# =========================================================
+# Firebase Local Configuration
+# =========================================================
+
+google-services.json
+
+# =========================================================
+# Build / Debug Files
+# =========================================================
+
+buildlog.txt
+*.tmp
+*.temp
+
+# Gradle reports
+**/build/reports/
+**/build/test-results/
+**/build/intermediates/
+**/build/kotlin/
+
+# =========================================================
+# iOS
+# =========================================================
+
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/ephemeral/
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+
+# Xcode
+DerivedData/
+*.xcuserstate
+*.xcscmblueprint
+
+# =========================================================
+# macOS
+# =========================================================
+
+macos/Pods/
+macos/Flutter/ephemeral/
+
+# =========================================================
+# Windows
+# =========================================================
+
+windows/flutter/ephemeral/
+
+# =========================================================
+# Linux
+# =========================================================
+
+linux/flutter/ephemeral/
+
+# =========================================================
+# Symbolication / Obfuscation
+# =========================================================
+
+app.*.symbols
+app.*.map.json
+# Local Android configuration
+**/local.properties
+
+# =========================================================
+# Miscellaneous Local Files
+# =========================================================
+
+*.bak
+*.backup
+*.old
+*.orig
+Thumbs.db
