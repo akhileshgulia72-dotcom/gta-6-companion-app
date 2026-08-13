@@ -50,13 +50,16 @@ Future<void> _loadFavorites() async {
 bool showFavorites = false;
 
   final List<String> categories = [
-    'All',
-    'Mansion',
-    'Apartment',
-    'Villa',
-    'Safe House',
-    'Business',
-  ];
+  'All',
+  'Mansion',
+  'Apartment',
+  'Villa',
+  'Penthouse',
+  'Residence',
+  'Safe House',
+  'Property',
+  'Business',
+];
 
   final List<Map<String, String>> properties = [
     {
@@ -78,6 +81,85 @@ bool showFavorites = false;
     'privacy': 'Very High',
     'bestFor': 'Luxury Safehouse',
   },
+  {
+  'name': 'Port Gellhorn Motel',
+  'type': 'Safe House',
+  'location': 'Port Gellhorn',
+  'price': 'Unknown',
+  'status': 'Reported',
+  'image': 'assets/images/port_gellhorn_motel.png',
+  'description':
+      'A weathered coastal motel in Port Gellhorn presented as a reported safehouse location. The property features a two-story motel layout, roadside parking and a distinctly local coastal atmosphere.',
+  'features':
+      'Two-Story Motel • Roadside Parking • Multiple Rooms • Coastal Location • Safehouse Potential • Classic Motel Design',
+  'bedrooms': 'Multiple Rooms',
+  'bathrooms': 'Unknown',
+  'garage': 'Outdoor Parking',
+  'pool': 'Unknown',
+  'security': 'Unknown',
+  'privacy': 'Medium',
+  'bestFor': 'Safehouse / Hideout',
+},
+
+{
+  'name': 'Vice City Marina Residence',
+  'type': 'Residence',
+  'location': 'Vice City Marina',
+  'price': 'Unknown',
+  'status': 'Concept',
+  'image': 'assets/images/vice_city_marina_residence.png',
+  'description':
+      'A modern waterfront residence concept overlooking the Vice City marina. The design combines luxury interiors, tropical landscaping, private vehicle access and direct waterfront surroundings.',
+  'features':
+      'Waterfront Location • Marina Views • Private Garage • Rooftop Terrace • Luxury Interior • Tropical Landscaping • Yacht Access',
+  'bedrooms': 'Unknown',
+  'bathrooms': 'Unknown',
+  'garage': 'Private Garage',
+  'pool': 'Yes',
+  'security': 'High',
+  'privacy': 'High',
+  'bestFor': 'Waterfront Lifestyle',
+},
+
+{
+  'name': 'Vice City Luxury Mansion',
+  'type': 'Mansion',
+  'location': 'Vice City',
+  'price': 'Unknown',
+  'status': 'Concept',
+  'image': 'assets/images/vice_city_luxury_mansion.png',
+  'description':
+      'A large waterfront luxury mansion concept designed around tropical landscaping, premium entertainment areas and expansive Vice City views.',
+  'features':
+      'Waterfront Views • Large Swimming Pool • Multiple Garages • Grand Entrance • Tropical Gardens • Luxury Outdoor Area • Premium Interior',
+  'bedrooms': 'Unknown',
+  'bathrooms': 'Unknown',
+  'garage': 'Multiple Vehicles',
+  'pool': 'Large Pool',
+  'security': 'Very High',
+  'privacy': 'Very High',
+  'bestFor': 'Luxury Living & Entertainment',
+},
+
+{
+  'name': "Boobie's Property",
+  'type': 'Property',
+  'location': 'Leonida',
+  'price': 'Unknown',
+  'status': 'Observed',
+  'image': 'assets/images/boobies_property.png',
+  'description':
+      "A distinctive waterfront property presented as observed in the available reference material. The residence features a colorful coastal design, dock access and a relaxed Vice City lifestyle aesthetic.",
+  'features':
+      'Waterfront Setting • Private Dock • Boat Access • Tropical Landscaping • Outdoor Parking • Coastal Architecture • Entertainment Area',
+  'bedrooms': 'Unknown',
+  'bathrooms': 'Unknown',
+  'garage': 'Outdoor Parking',
+  'pool': 'Waterfront Access',
+  'security': 'Unknown',
+  'privacy': 'Medium',
+  'bestFor': 'Waterfront Recreation',
+},
 
   {
     'name': 'Grassriverside Estate',

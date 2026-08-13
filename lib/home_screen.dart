@@ -13,6 +13,7 @@ import 'package:gta_6_comapnion_app/services/premium_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slide_countdown/slide_countdown.dart';
 import 'package:gta_6_comapnion_app/quiz_home_screen.dart';
+import 'package:gta_6_comapnion_app/advanced_map_screen.dart';
 
 
 class Homepage extends StatefulWidget {
@@ -555,10 +556,21 @@ Widget _premiumMiniFeature(
     "Properties",
   ),
 ),
-              _premiumMiniFeature(
-                Icons.map,
-                "Advanced Map",
-              ),
+              GestureDetector(
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const AdvancedMapScreen(),
+      ),
+    );
+  },
+  child: _premiumMiniFeature(
+    Icons.map,
+    "Advanced Map",
+  ),
+),
+              
               _premiumMiniFeature(
                 Icons.photo_library,
                 "Gallery",
