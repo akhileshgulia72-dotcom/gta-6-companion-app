@@ -7,11 +7,13 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:gta_6_comapnion_app/charaters.dart';
 import 'package:gta_6_comapnion_app/map.dart';
 import 'package:gta_6_comapnion_app/news_model.dart' hide NewsService;
-import 'package:gta_6_comapnion_app/quiz_screen.dart';
+import 'package:gta_6_comapnion_app/premium_properties_screen.dart';
+import 'package:gta_6_comapnion_app/services/analytics_service.dart';
+import 'package:gta_6_comapnion_app/services/premium_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slide_countdown/slide_countdown.dart';
 import 'package:gta_6_comapnion_app/quiz_home_screen.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+
 
 class Homepage extends StatefulWidget {
   const Homepage({super.key});
@@ -156,6 +158,36 @@ Future<void> checkPopup() async {
       () => showWelcomePopup(),
     );
   }
+}
+Widget _premiumMiniFeature(
+  IconData icon,
+  String label,
+) {
+  return Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Icon(
+          icon,
+          color: Colors.white,
+          size: 24,
+        ),
+      ),
+      const SizedBox(height: 8),
+      Text(
+        label,
+        style: GoogleFonts.poppins(
+          color: Colors.white70,
+          fontSize: 12,
+        ),
+      ),
+    ],
+  );
 }
 
   Widget _timeLabel(String text) {
@@ -430,6 +462,127 @@ Future<void> checkPopup() async {
                          
 
                           const SizedBox(height: 20),
+                          Padding(
+  padding: const EdgeInsets.symmetric(horizontal: 12),
+  child: GestureDetector(
+    onTap: () {
+      AnalyticsService.premiumOpened();
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const PremiumScreen(),
+        ),
+      );
+    },
+    child: Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFFFF006E),
+            Color(0xFF8338EC),
+            Color(0xFF3A86FF),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.workspace_premium,
+                color: Colors.amber,
+                size: 35,
+              ),
+
+              const SizedBox(width: 12),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "GTA 6 PREMIUM",
+                      style: GoogleFonts.orbitron(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      "Unlock exclusive features",
+                      style: GoogleFonts.poppins(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const Icon(
+                Icons.arrow_forward_ios,
+                color: Colors.white,
+                size: 18,
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 15),
+
+          Row(
+            mainAxisAlignment:
+                MainAxisAlignment.spaceAround,
+            children: [
+              GestureDetector(
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            const PremiumPropertiesScreen(),
+      ),
+    );
+  },
+  child: _premiumMiniFeature(
+    Icons.home_work,
+    "Properties",
+  ),
+),
+              _premiumMiniFeature(
+                Icons.map,
+                "Advanced Map",
+              ),
+              _premiumMiniFeature(
+                Icons.photo_library,
+                "Gallery",
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 15),
+
+          Text(
+            "⭐ ₹199 ONE-TIME",
+            style: GoogleFonts.orbitron(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    ),
+  ),
+),
+
+const SizedBox(height: 25),
                           Padding(
                             padding: const EdgeInsets.only(right: 150),
                             child: Text(

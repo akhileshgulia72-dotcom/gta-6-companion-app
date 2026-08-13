@@ -5,6 +5,7 @@ import 'package:gta_6_comapnion_app/main.dart';
 import 'dart:math';
 
 import 'package:gta_6_comapnion_app/questions.dart';
+import 'package:gta_6_comapnion_app/services/analytics_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class QuizScreen extends StatefulWidget {
@@ -71,6 +72,9 @@ class _QuizScreenState extends State<QuizScreen> {
     bool completed = prefs.getBool("quizCompleted") ?? false;
 
     if (completed) {
+      await AnalyticsService.quizCompleted(
+  score: score,
+);
       setState(() {
         quizCompleted = true;
       });
@@ -248,20 +252,23 @@ Future<void> loadQuizProgress() async {
   }
 
   @override
-  void initState() {
-    super.initState();
+  @override
+void initState() {
+  super.initState();
 
-    loadRewardedAd();
-    loadInterstitialAd();
+  loadRewardedAd();
+  loadInterstitialAd();
 
-    todayQuestions = getTodayQuestions();
+  todayQuestions = getTodayQuestions();
 
-    // Temporary question so the screen doesn't crash
-    currentQuestion = todayQuestions[0];
-   loadQuestionIndex().then((_) {
-  loadQuizProgress();
-});
-  }
+  currentQuestion = todayQuestions[0];
+
+  AnalyticsService.quizStarted();
+
+  loadQuestionIndex().then((_) {
+    loadQuizProgress();
+  });
+}
 
   @override
   Widget build(BuildContext context) {
@@ -459,22 +466,29 @@ Future<void> loadQuizProgress() async {
                                 padding: const EdgeInsets.only(bottom: 15),
                                 child: ElevatedButton(
                                   onPressed: answerSelected
-                                      ? null
-                                      : () {
-                                          setState(() {
-                                            selectedAnswer = index;
-                                            answerSelected = true;
-                                            if (index ==
-                                                currentQuestion.answerIndex) {
-                                              answeredCorrect = true;
-                                              score++;
-                                              coins += 100;
-                                              saveQuizProgress();
-                                            } else {
-                                              answeredCorrect = false;
-                                            }
-                                          });
-                                        },
+    ? null
+    : () {
+        final bool isCorrect =
+            index == currentQuestion.answerIndex;
+
+        setState(() {
+          selectedAnswer = index;
+          answerSelected = true;
+
+          if (isCorrect) {
+            answeredCorrect = true;
+            score++;
+            coins += 100;
+            saveQuizProgress();
+          } else {
+            answeredCorrect = false;
+          }
+        });
+
+        AnalyticsService.questionAnswered(
+          correct: isCorrect,
+        );
+      },
 
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: getOptionColor(index),
