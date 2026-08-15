@@ -46,31 +46,34 @@ class DefaultFirebaseOptions {
     messagingSenderId: '283463782171',
     projectId: 'gta6-companion-app',
     authDomain: 'gta6-companion-app.firebaseapp.com',
+    databaseURL: 'https://gta6-companion-app-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'gta6-companion-app.firebasestorage.app',
+    measurementId: 'G-F9FP2NK7XV',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyDAPOnZwRzGJygZrN-eRWOx0EjIJsCI3rM',
-    appId: '1:283463782171:android:23245deb25f9271f298dbe',
+    appId: '1:283463782171:android:dd870fe3e26dc869298dbe',
     messagingSenderId: '283463782171',
     projectId: 'gta6-companion-app',
+    databaseURL: 'https://gta6-companion-app-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'gta6-companion-app.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyCiibb3xL28s6F6raSZuzPDzEVAZjruYao',
-    appId: '1:283463782171:ios:c8b7b24a5046b810298dbe',
+    appId: '1:283463782171:ios:ced7fa9c9da27602298dbe',
     messagingSenderId: '283463782171',
     projectId: 'gta6-companion-app',
+    databaseURL: 'https://gta6-companion-app-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'gta6-companion-app.firebasestorage.app',
-    iosBundleId: 'com.example.gta6ComapnionApp',
+    iosBundleId: 'com.akhileshgulia.gta6companion',
   );
-
   static const FirebaseOptions macos = FirebaseOptions(
     apiKey: 'AIzaSyCiibb3xL28s6F6raSZuzPDzEVAZjruYao',
     appId: '1:283463782171:ios:c8b7b24a5046b810298dbe',
     messagingSenderId: '283463782171',
     projectId: 'gta6-companion-app',
+    databaseURL: 'https://gta6-companion-app-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'gta6-companion-app.firebasestorage.app',
     iosBundleId: 'com.example.gta6ComapnionApp',
   );
@@ -81,6 +84,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '283463782171',
     projectId: 'gta6-companion-app',
     authDomain: 'gta6-companion-app.firebaseapp.com',
+    databaseURL: 'https://gta6-companion-app-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'gta6-companion-app.firebasestorage.app',
+    measurementId: 'G-N1H8SSF70K',
   );
 }

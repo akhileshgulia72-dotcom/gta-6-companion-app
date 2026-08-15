@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:gta_6_comapnion_app/advanced_map_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class PropertyDetailsScreen extends StatefulWidget {
@@ -299,11 +300,15 @@ Future<void> _toggleFavorite() async {
                     height: 55,
                     child: ElevatedButton.icon(
                       onPressed: () {
-                        _showComingSoon(
-                          context,
-                          'Interactive property map is coming soon.',
-                        );
-                      },
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => AdvancedMapScreen(
+        focusProperty: property['name'],
+      ),
+    ),
+  );
+},
                       icon: const Icon(
                         Icons.location_on,
                       ),

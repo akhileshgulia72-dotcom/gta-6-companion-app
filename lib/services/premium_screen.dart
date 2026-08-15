@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-
-import 'package:gta_6_comapnion_app/services/premium_service.dart';
-
+import 'package:gta_6_comapnion_app/premium_gallery_screen.dart';
+import 'package:gta_6_comapnion_app/services/premium_state.dart';
+import 'package:gta_6_comapnion_app/premium_vehicles_screen.dart';
+import 'package:gta_6_comapnion_app/premium_properties_screen.dart';
+import 'package:gta_6_comapnion_app/advanced_map_screen.dart';
 
 class PremiumScreen extends StatefulWidget {
   const PremiumScreen({super.key});
@@ -12,16 +14,13 @@ class PremiumScreen extends StatefulWidget {
 }
 
 class _PremiumScreenState extends State<PremiumScreen> {
-  final PremiumService premiumState = PremiumService();
-
   @override
   void initState() {
     super.initState();
 
     premiumState.addListener(_onPremiumChanged);
 
-    // Safe to call again. The service checks availability
-    // and loads the product.
+    // Safe to call again.
     premiumState.initialize();
   }
 
@@ -36,6 +35,55 @@ class _PremiumScreenState extends State<PremiumScreen> {
     premiumState.removeListener(_onPremiumChanged);
     super.dispose();
   }
+
+  // ===============================================================
+  // PREMIUM FEATURE NAVIGATION
+  // ===============================================================
+
+  void _openPremiumFeature({
+    required String title,
+    required Widget? screen,
+  }) {
+    // Premium not unlocked
+    if (!premiumState.isPremium) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            '🔒 Unlock GTA 6 PRO to access this feature.',
+          ),
+          backgroundColor: Color(0xFF1B1B1B),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    // Feature exists → open it
+    if (screen != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => screen,
+        ),
+      );
+      return;
+    }
+
+    // Feature not built yet
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '🚧 $title is coming soon!',
+        ),
+        backgroundColor: const Color(0xFF1B1B1B),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  // ===============================================================
+  // BUILD
+  // ===============================================================
 
   @override
   Widget build(BuildContext context) {
@@ -60,11 +108,15 @@ class _PremiumScreenState extends State<PremiumScreen> {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
+
           child: Column(
             children: [
               const SizedBox(height: 15),
 
+              // =====================================================
               // PRO ICON
+              // =====================================================
+
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -92,6 +144,10 @@ class _PremiumScreenState extends State<PremiumScreen> {
               ),
 
               const SizedBox(height: 20),
+
+              // =====================================================
+              // TITLE
+              // =====================================================
 
               Text(
                 premiumState.isPremium
@@ -121,16 +177,101 @@ class _PremiumScreenState extends State<PremiumScreen> {
 
               const SizedBox(height: 30),
 
-              _feature('🏠', 'Premium Property Database'),
-              _feature('🗺️', 'Advanced Map'),
-              _feature('🚗', 'Premium Vehicle Information'),
-              _feature('🖼️', 'Premium Gallery'),
-              _feature('🔔', 'Premium Alerts'),
-              _feature('🚫', 'Ad-Free Experience'),
+              // =====================================================
+              // PREMIUM FEATURES
+              // =====================================================
+
+              // 🏠 PROPERTY DATABASE
+              _feature(
+                '🏠',
+                'Premium Property Database',
+                onTap: () {
+                  _openPremiumFeature(
+                    title: 'Premium Property Database',
+                    screen: const PremiumPropertiesScreen(),
+                  );
+                },
+              ),
+
+              // 🗺️ ADVANCED MAP
+              _feature(
+                '🗺️',
+                'Advanced Map',
+                onTap: () {
+                  _openPremiumFeature(
+                    title: 'Advanced Map',
+                    screen: const AdvancedMapScreen(),
+                  );
+                },
+              ),
+
+              // 🚗 VEHICLE DATABASE
+              _feature(
+                '🚗',
+                'Premium Vehicle Information',
+                onTap: () {
+                  _openPremiumFeature(
+                    title: 'Premium Vehicle Information',
+                    screen: const PremiumVehiclesScreen(),
+                  );
+                },
+              ),
+
+              // 🖼️ PREMIUM GALLERY
+             _feature(
+  '🖼️',
+  'Premium Gallery',
+  onTap: () {
+    _openPremiumFeature(
+      title: 'Premium Gallery',
+      screen: const PremiumGalleryScreen(),
+    );
+  },
+),
+
+              // 🔔 PREMIUM ALERTS
+              _feature(
+                '🔔',
+                'Premium Alerts',
+                onTap: () {
+                  _openPremiumFeature(
+                    title: 'Premium Alerts',
+                    screen: null,
+                  );
+                },
+              ),
+
+              // 🚫 AD-FREE EXPERIENCE
+              _feature(
+                '🚫',
+                'Ad-Free Experience',
+                onTap: () {
+                  if (!premiumState.isPremium) {
+                    _openPremiumFeature(
+                      title: 'Ad-Free Experience',
+                      screen: null,
+                    );
+                    return;
+                  }
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        '✅ Ad-Free Experience is active!',
+                      ),
+                      backgroundColor: Color(0xFF1B1B1B),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
+              ),
 
               const SizedBox(height: 30),
 
+              // =====================================================
               // PRICE
+              // =====================================================
+
               if (!premiumState.isPremium && product != null)
                 Text(
                   product.price,
@@ -164,7 +305,10 @@ class _PremiumScreenState extends State<PremiumScreen> {
 
               const SizedBox(height: 25),
 
+              // =====================================================
               // PURCHASE / ACTIVE BUTTON
+              // =====================================================
+
               if (premiumState.isPremium)
                 Container(
                   width: double.infinity,
@@ -230,7 +374,10 @@ class _PremiumScreenState extends State<PremiumScreen> {
 
               const SizedBox(height: 15),
 
-              // RESTORE
+              // =====================================================
+              // RESTORE PURCHASE
+              // =====================================================
+
               if (!premiumState.isPremium)
                 TextButton(
                   onPressed: premiumState.isLoading
@@ -244,7 +391,10 @@ class _PremiumScreenState extends State<PremiumScreen> {
                   ),
                 ),
 
+              // =====================================================
               // ERROR
+              // =====================================================
+
               if (premiumState.errorMessage != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 15),
@@ -268,6 +418,10 @@ class _PremiumScreenState extends State<PremiumScreen> {
 
               const SizedBox(height: 20),
 
+              // =====================================================
+              // GOOGLE PLAY PAYMENT
+              // =====================================================
+
               Text(
                 'Secure payment through Google Play',
                 style: GoogleFonts.poppins(
@@ -282,51 +436,62 @@ class _PremiumScreenState extends State<PremiumScreen> {
     );
   }
 
+  // ===============================================================
+  // PREMIUM FEATURE CARD
+  // ===============================================================
+
   Widget _feature(
     String icon,
-    String title,
-  ) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.05),
-        ),
-      ),
-      child: Row(
-        children: [
-          Text(
-            icon,
-            style: const TextStyle(
-              fontSize: 25,
-            ),
+    String title, {
+    VoidCallback? onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: premiumState.isPremium
+                ? const Color(0xFFFF4DA6).withValues(alpha: 0.25)
+                : Colors.white.withValues(alpha: 0.05),
           ),
-
-          const SizedBox(width: 15),
-
-          Expanded(
-            child: Text(
-              title,
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
+        ),
+        child: Row(
+          children: [
+            Text(
+              icon,
+              style: const TextStyle(
+                fontSize: 25,
               ),
             ),
-          ),
 
-          Icon(
-            premiumState.isPremium
-                ? Icons.check_circle
-                : Icons.lock_outline,
-            color: premiumState.isPremium
-                ? const Color(0xFF00D4FF)
-                : Colors.white38,
-          ),
-        ],
+            const SizedBox(width: 15),
+
+            Expanded(
+              child: Text(
+                title,
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+
+            Icon(
+              premiumState.isPremium
+                  ? Icons.arrow_forward_ios
+                  : Icons.lock_outline,
+              color: premiumState.isPremium
+                  ? const Color(0xFF00D4FF)
+                  : Colors.white38,
+              size: premiumState.isPremium ? 17 : 22,
+            ),
+          ],
+        ),
       ),
     );
   }

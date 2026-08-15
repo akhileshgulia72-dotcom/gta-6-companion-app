@@ -7,6 +7,8 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:gta_6_comapnion_app/charaters.dart';
 import 'package:gta_6_comapnion_app/map.dart';
 import 'package:gta_6_comapnion_app/news_model.dart' hide NewsService;
+
+import 'package:gta_6_comapnion_app/services/premium_state.dart';
 import 'package:gta_6_comapnion_app/premium_properties_screen.dart';
 import 'package:gta_6_comapnion_app/services/analytics_service.dart';
 import 'package:gta_6_comapnion_app/services/premium_screen.dart';
@@ -14,6 +16,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slide_countdown/slide_countdown.dart';
 import 'package:gta_6_comapnion_app/quiz_home_screen.dart';
 import 'package:gta_6_comapnion_app/advanced_map_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:gta_6_comapnion_app/news_screen.dart';
 
 
 class Homepage extends StatefulWidget {
@@ -209,16 +213,28 @@ Widget _premiumMiniFeature(
   RewardedAd? rewardedAd;
   bool isRewardedReady = false;
   Future<void> loadNews() async {
-    try {
-      newsList = await NewsService().fetchNews();
-    } catch (e) {
-      debugPrint(e.toString());
-    }
+  try {
+    final service = NewsService();
+
+    final news = await service.fetchNews();
+
+    if (!mounted) return;
+
+    setState(() {
+      newsList = news;
+      isLoadingNews = false;
+    });
+  } catch (e, stackTrace) {
+    debugPrint('❌ NEWS ERROR: $e');
+    debugPrint('❌ STACK: $stackTrace');
+
+    if (!mounted) return;
 
     setState(() {
       isLoadingNews = false;
     });
   }
+}
 
   void loadRewardedAd() {
     RewardedAd.load(
@@ -337,11 +353,32 @@ Widget _premiumMiniFeature(
           ? const CharaterScreen()
           : currentIndex == 1
           ? const MapScreen()
-          : SingleChildScrollView(
-              child: Padding(
+          : Stack(
+              children: [
+                // Home background image
+                Positioned.fill(
+                  child: Image.asset(
+                    'assets/images/home_bg.png',
+                    fit: BoxFit.cover,
+                  ),
+                ),
+
+                // Dark overlay keeps all HomeScreen content readable
+                Positioned.fill(
+                  child: Container(
+                    color: Colors.black.withOpacity(0.55),
+                  ),
+                ),
+
+                // Existing HomeScreen content
+                SingleChildScrollView(
+                  child: Padding(
                 padding: const EdgeInsets.only(left: 5, right: 5),
                 child: Card(
-                  elevation: 10,
+                  elevation: 0,
+                  color: Colors.transparent,
+  surfaceTintColor: Colors.transparent,
+  shadowColor: Colors.transparent,
                   child: Column(
                     children: [
                       ClipRRect(
@@ -556,8 +593,18 @@ Widget _premiumMiniFeature(
     "Properties",
   ),
 ),
-              GestureDetector(
+             GestureDetector(
   onTap: () {
+    if (!premiumState.isPremium) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const PremiumScreen(),
+        ),
+      );
+      return;
+    }
+
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -678,12 +725,55 @@ const SizedBox(height: 25),
 );
                                   },
                                 ),
+                                const SizedBox(height: 10),
+
+Padding(
+  padding: const EdgeInsets.symmetric(horizontal: 16),
+  child: SizedBox(
+    width: double.infinity,
+    child: OutlinedButton.icon(
+      onPressed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const NewsScreen(),
+          ),
+        );
+      },
+      icon: const Icon(
+        Icons.arrow_forward,
+        color: Colors.pink,
+      ),
+      label: Text(
+        'VIEW ALL NEWS',
+        style: GoogleFonts.orbitron(
+          color: Colors.pink,
+          fontWeight: FontWeight.bold,
+          fontSize: 13,
+        ),
+      ),
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(vertical: 15),
+        side: const BorderSide(
+          color: Colors.pink,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+      ),
+    ),
+  ),
+),
+
+const SizedBox(height: 25),
                         ],
                       ),
                     ],
                   ),
                 ),
-              ),
+                  ),
+                ),
+              ],
             ),
 
       bottomNavigationBar: BottomNavigationBar(

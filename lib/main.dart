@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:gta_6_comapnion_app/services/analytics_service.dart';
 import 'package:gta_6_comapnion_app/services/auth_service.dart';
@@ -10,43 +12,64 @@ import 'package:gta_6_comapnion_app/splash_screen.dart';
 import 'firebase_options.dart';
 import 'firebase_api.dart';
 
-import 'package:shared_preferences/shared_preferences.dart';
-
 int userCoins = 100;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // =========================================================
   // Firebase
+  // =========================================================
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
+  // =========================================================
+  // Supabase
+  // =========================================================
+
+  await Supabase.initialize(
+    url: 'https://zyafvnmsaizlqmoraiuj.supabase.co',
+    anonKey: 'sb_publishable_UuGQZwAepVX8hdFnHSzKLQ_WWJAHE4X',
+  );
+
+  // =========================================================
   // Initialize GTA 6 PRO system
+  // =========================================================
+
   await premiumState.initialize();
 
   // =========================================================
-  // TEST MODE ONLY
-  // This makes the current app installation behave as PRO.
-  // REMOVE THIS LINE BEFORE RELEASE / PRODUCTION BUILD.
-  // =========================================================
-  premiumState.enableTestPremium();
-
   // Firebase anonymous authentication
+  // =========================================================
+
   await AuthService.initialize();
 
+  // =========================================================
   // Analytics
+  // =========================================================
+
   await AnalyticsService.appOpened();
 
+  // =========================================================
   // Notifications
+  // =========================================================
+
   await FirebaseApi().initNotifications();
 
+  // =========================================================
   // Load coins
+  // =========================================================
+
   final prefs = await SharedPreferences.getInstance();
 
   userCoins = prefs.getInt("coins") ?? 120;
 
+  // =========================================================
   // Start app
+  // =========================================================
+
   runApp(const MyApp());
 }
 

@@ -515,7 +515,7 @@ class _LuckyDrawScreenState extends State<LuckyDrawScreen> {
               emoji: "🔥",
               title: "GTA VI Ultimate Edition",
               subtitle: "2 Winners",
-              entryFee: 4000,
+              entryFee: 100,
               color: Colors.purple,
             ),
 
