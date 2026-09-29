@@ -1,53 +1,41 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
 
 import '../models/vehicle_model.dart';
 
 class VehicleService {
-  final SupabaseClient _supabase =
-      Supabase.instance.client;
+  static const String _vehiclesUrl =
+      'https://raw.githubusercontent.com/akhileshgulia72-dotcom/gta6-news-server/refs/heads/main/vehicles.json';
 
   Future<List<VehicleModel>> getVehicles() async {
     try {
-      final response = await _supabase
-          .from('vehicles')
-          .select()
-          .eq('is_active', true)
-          .order('sort_order', ascending: true);
+      final response = await http.get(
+        Uri.parse(_vehiclesUrl),
+      );
 
-      return (response as List)
+      if (response.statusCode != 200) {
+        throw Exception(
+          'Failed to load vehicles: ${response.statusCode}',
+        );
+      }
+
+      final List<dynamic> data = jsonDecode(response.body);
+
+      final vehicles = data
           .map(
             (vehicle) => VehicleModel.fromJson(
               Map<String, dynamic>.from(vehicle),
             ),
           )
+          .where((vehicle) => vehicle.isActive)
           .toList();
+
+      return vehicles;
     } catch (e) {
       throw Exception(
         'Failed to load vehicles: $e',
       );
-    }
-  }
-
-  // TEMPORARY TEST ONLY
-  Future<void> testVehicleConnection() async {
-    try {
-      final vehicles = await getVehicles();
-
-      print('====================================');
-      print('🚗 VEHICLE DATABASE TEST');
-      print('Vehicles found: ${vehicles.length}');
-
-      for (final vehicle in vehicles) {
-        print(
-          'Vehicle: ${vehicle.name} | '
-          'Category: ${vehicle.category} | '
-          'Premium: ${vehicle.isPremium}',
-        );
-      }
-
-      print('====================================');
-    } catch (e) {
-      print('❌ Vehicle database error: $e');
     }
   }
 }

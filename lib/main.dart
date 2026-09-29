@@ -1,11 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:gta_6_comapnion_app/services/analytics_service.dart';
 import 'package:gta_6_comapnion_app/services/auth_service.dart';
-import 'package:gta_6_comapnion_app/services/premium_state.dart';
 
 import 'package:gta_6_comapnion_app/splash_screen.dart';
 
@@ -17,60 +17,113 @@ int userCoins = 100;
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // =========================================================
-  // Firebase
-  // =========================================================
+  // ------------------------------------------------------------
+  // ONLY Firebase initialization blocks app startup.
+  // ------------------------------------------------------------
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // =========================================================
-  // Supabase
-  // =========================================================
-
-  await Supabase.initialize(
-    url: 'https://zyafvnmsaizlqmoraiuj.supabase.co',
-    anonKey: 'sb_publishable_UuGQZwAepVX8hdFnHSzKLQ_WWJAHE4X',
-  );
-
-  // =========================================================
-  // Initialize GTA 6 PRO system
-  // =========================================================
-
-  await premiumState.initialize();
-
-  // =========================================================
-  // Firebase anonymous authentication
-  // =========================================================
-
-  await AuthService.initialize();
-
-  // =========================================================
-  // Analytics
-  // =========================================================
-
-  await AnalyticsService.appOpened();
-
-  // =========================================================
-  // Notifications
-  // =========================================================
-
-  await FirebaseApi().initNotifications();
-
-  // =========================================================
-  // Load coins
-  // =========================================================
-
-  final prefs = await SharedPreferences.getInstance();
-
-  userCoins = prefs.getInt("coins") ?? 120;
-
-  // =========================================================
-  // Start app
-  // =========================================================
+  // ------------------------------------------------------------
+  // START UI IMMEDIATELY
+  // ------------------------------------------------------------
 
   runApp(const MyApp());
+
+  // ------------------------------------------------------------
+  // BACKGROUND INITIALIZATION
+  // ------------------------------------------------------------
+
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    unawaited(
+      _initializeBackgroundServices(),
+    );
+  });
+}
+
+Future<void> _initializeBackgroundServices() async {
+  // ------------------------------------------------------------
+  // SHARED PREFERENCES
+  // ------------------------------------------------------------
+
+  try {
+    final prefs = await SharedPreferences.getInstance();
+
+    userCoins = prefs.getInt('coins') ?? 120;
+
+    debugPrint(
+      'Coins loaded: $userCoins',
+    );
+  } catch (e, stackTrace) {
+    debugPrint(
+      'SharedPreferences initialization failed: $e',
+    );
+
+    debugPrintStack(
+      stackTrace: stackTrace,
+    );
+  }
+
+  // ------------------------------------------------------------
+  // AUTH
+  // ------------------------------------------------------------
+
+  try {
+    await AuthService.initialize();
+
+    debugPrint(
+      'Auth initialized.',
+    );
+  } catch (e, stackTrace) {
+    debugPrint(
+      'Auth initialization failed: $e',
+    );
+
+    debugPrintStack(
+      stackTrace: stackTrace,
+    );
+  }
+
+  // ------------------------------------------------------------
+  // ANALYTICS
+  // ------------------------------------------------------------
+
+  try {
+    await AnalyticsService.appOpened();
+
+    debugPrint(
+      'Analytics initialized.',
+    );
+  } catch (e, stackTrace) {
+    debugPrint(
+      'Analytics initialization failed: $e',
+    );
+
+    debugPrintStack(
+      stackTrace: stackTrace,
+    );
+  }
+
+  // ------------------------------------------------------------
+  // FIREBASE MESSAGING
+  // ------------------------------------------------------------
+
+  try {
+    await FirebaseApi().initNotifications();
+
+    debugPrint(
+      'Notifications initialized.',
+    );
+  } catch (e, stackTrace) {
+    debugPrint(
+      'Notification initialization failed: $e',
+    );
+
+    debugPrintStack(
+      stackTrace: stackTrace,
+    );
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -85,8 +138,12 @@ class MyApp extends StatelessWidget {
 
       theme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF121212),
-        primaryColor: const Color(0xFFFF4DA6),
+
+        scaffoldBackgroundColor:
+            const Color(0xFF121212),
+
+        primaryColor:
+            const Color(0xFFFF4DA6),
 
         colorScheme: const ColorScheme.dark(
           secondary: Color(0xFF00D4FF),

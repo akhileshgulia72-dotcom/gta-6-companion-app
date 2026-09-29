@@ -4,9 +4,14 @@ import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 
 class PremiumService extends ChangeNotifier {
+  // ===============================================================
+  // CONFIGURATION
+  // ===============================================================
 
+  static const String productId = 'gta6_proo';
 
-  static const String productId = 'gta6_pro';
+  // NEVER enable this in production.
+  static const bool testPremiumMode = false;
 
   final InAppPurchase _iap = InAppPurchase.instance;
 
@@ -14,60 +19,179 @@ class PremiumService extends ChangeNotifier {
 
   ProductDetails? premiumProduct;
 
+  // ===============================================================
+  // STATE
+  // ===============================================================
+
   bool isPremium = false;
   bool isLoading = false;
   bool storeAvailable = false;
 
   String? errorMessage;
 
+  bool _initialized = false;
+
+  // Prevent duplicate initialize() calls.
+  Future<void>? _initializeFuture;
+
+  // Prevent duplicate queryProductDetails() calls.
+  Future<void>? _loadProductFuture;
+
+  // Prevent duplicate restorePurchases() calls.
+  Future<void>? _restoreFuture;
+
+  // Prevent duplicate purchase requests.
+  bool _purchaseInProgress = false;
+
   // ===============================================================
   // INITIALIZE
   // ===============================================================
 
-  Future<void> initialize() async {
-    // Prevent multiple listeners if initialize() is called again.
-    await _purchaseSubscription?.cancel();
+  Future<void> initialize() {
+    debugPrint('GTA 6 PRO: initialize requested.');
 
-    _purchaseSubscription = _iap.purchaseStream.listen(
-      _handlePurchaseUpdates,
-      onError: (error) {
-        debugPrint('Purchase stream error: $error');
-
-        errorMessage = 'Purchase system error.';
-        isLoading = false;
-
-        notifyListeners();
-      },
-    );
-
-    // Check Google Play Billing availability.
-    storeAvailable = await _iap.isAvailable();
-
-    debugPrint(
-      'Google Play Billing available: $storeAvailable',
-    );
-
-    if (!storeAvailable) {
-      errorMessage =
-          'Google Play Billing is unavailable.';
-
-      notifyListeners();
-      return;
+    if (_initialized) {
+      debugPrint('GTA 6 PRO: already initialized.');
+      return Future.value();
     }
 
-    await loadProduct();
+    // CRITICAL:
+    // Multiple screens can call initialize() simultaneously.
+    // They must all share ONE Future.
+    if (_initializeFuture != null) {
+      debugPrint('GTA 6 PRO: initialization already running.');
+      return _initializeFuture!;
+    }
 
-    // Restore any previous purchase.
-    //
-    // This allows a user who already bought GTA 6 PRO
-    // to regain premium access after reinstalling the app
-    // or changing devices with the same Google account.
+    final future = _initializeInternal();
+
+    _initializeFuture = future;
+
+    return future;
+  }
+
+  Future<void> _initializeInternal() async {
+    bool completedSuccessfully = false;
+
     try {
-      await _iap.restorePurchases();
-    } catch (e) {
+      debugPrint('================================');
+      debugPrint('GTA 6 PRO PREMIUM INITIALIZATION');
+      debugPrint('================================');
+
+      // -------------------------------------------------------------
+      // TEST MODE
+      // -------------------------------------------------------------
+
+      if (testPremiumMode) {
+        isPremium = true;
+        storeAvailable = true;
+        errorMessage = null;
+        _initialized = true;
+
+        completedSuccessfully = true;
+
+        notifyListeners();
+
+        debugPrint('GTA 6 PRO TEST MODE ENABLED.');
+
+        return;
+      }
+
+      // -------------------------------------------------------------
+      // PURCHASE STREAM
+      // -------------------------------------------------------------
+
+      // Subscribe exactly once.
+      if (_purchaseSubscription == null) {
+        debugPrint('Creating purchase stream listener.');
+
+        _purchaseSubscription = _iap.purchaseStream.listen(
+          _handlePurchaseUpdates,
+          onError: (Object error, StackTrace stackTrace) {
+            debugPrint('Purchase stream error: $error');
+            debugPrintStack(stackTrace: stackTrace);
+
+            errorMessage = 'Purchase system error.';
+            isLoading = false;
+            _purchaseInProgress = false;
+
+            notifyListeners();
+          },
+        );
+      }
+
+      // -------------------------------------------------------------
+      // GOOGLE PLAY AVAILABILITY
+      // -------------------------------------------------------------
+
+      try {
+        storeAvailable = await _iap.isAvailable();
+      } catch (e, stackTrace) {
+        debugPrint('Billing availability error: $e');
+        debugPrintStack(stackTrace: stackTrace);
+
+        storeAvailable = false;
+        errorMessage = 'Google Play Billing is unavailable.';
+
+        notifyListeners();
+
+        return;
+      }
+
       debugPrint(
-        'Initial restore error: $e',
+        'Google Play Billing available: $storeAvailable',
       );
+
+      if (!storeAvailable) {
+        errorMessage = 'Google Play Billing is unavailable.';
+
+        notifyListeners();
+
+        return;
+      }
+
+      // -------------------------------------------------------------
+      // PRODUCT
+      // -------------------------------------------------------------
+
+      await loadProduct();
+
+      // -------------------------------------------------------------
+      // RESTORE
+      // -------------------------------------------------------------
+
+      // Restore only through our protected method.
+      await restorePurchases();
+
+      // -------------------------------------------------------------
+      // COMPLETE
+      // -------------------------------------------------------------
+
+      _initialized = true;
+      completedSuccessfully = true;
+
+      errorMessage = null;
+
+      notifyListeners();
+
+      debugPrint('GTA 6 PRO initialization completed.');
+    } catch (e, stackTrace) {
+      debugPrint('Premium initialization exception: $e');
+      debugPrintStack(stackTrace: stackTrace);
+
+      errorMessage = 'Premium system initialization failed.';
+
+      notifyListeners();
+    } finally {
+      // VERY IMPORTANT:
+      //
+      // If initialization failed, don't leave a permanently
+      // completed Future in memory.
+      //
+      // This allows a later screen/open attempt to retry.
+      if (!completedSuccessfully) {
+        _initializeFuture = null;
+      }
     }
   }
 
@@ -75,98 +199,186 @@ class PremiumService extends ChangeNotifier {
   // LOAD PRODUCT
   // ===============================================================
 
-  Future<void> loadProduct() async {
+  Future<void> loadProduct() {
+    // Product already loaded.
+    if (premiumProduct != null) {
+      return Future.value();
+    }
+
+    // CRITICAL:
+    //
+    // If HomeScreen, PremiumScreen, popup, etc. all call
+    // loadProduct() at the same time, ONLY ONE
+    // queryProductDetails() request is sent to Android.
+    //
+    // This directly protects against:
+    //
+    // Reply already submitted
+    //
+    // platform-channel errors.
+    if (_loadProductFuture != null) {
+      debugPrint(
+        'GTA 6 PRO: product query already running.',
+      );
+
+      return _loadProductFuture!;
+    }
+
+    final future = _loadProductInternal();
+
+    _loadProductFuture = future;
+
+    // Always release the lock after the request finishes.
+    //
+    // This is important because your old implementation could
+    // leave the Future permanently stored after an error.
+    future.whenComplete(() {
+      if (identical(_loadProductFuture, future)) {
+        _loadProductFuture = null;
+      }
+    });
+
+    return future;
+  }
+
+  Future<void> _loadProductInternal() async {
     try {
       errorMessage = null;
 
-      debugPrint(
-        'Searching Google Play product: $productId',
-      );
+      // -------------------------------------------------------------
+      // CHECK BILLING
+      // -------------------------------------------------------------
 
-      final response = await _iap.queryProductDetails(
-        {productId},
-      );
+      if (!storeAvailable) {
+        try {
+          storeAvailable = await _iap.isAvailable();
+        } catch (e, stackTrace) {
+          debugPrint(
+            'Billing availability retry error: $e',
+          );
 
-      // -----------------------------------------------------------
-      // QUERY ERROR
-      // -----------------------------------------------------------
+          debugPrintStack(stackTrace: stackTrace);
 
-      if (response.error != null) {
-        debugPrint(
-          'Product query error: '
-          '${response.error!.message}',
-        );
+          storeAvailable = false;
+        }
+      }
 
-        errorMessage =
-            response.error!.message;
+      if (!storeAvailable) {
+        errorMessage = 'Google Play Billing is unavailable.';
 
         notifyListeners();
+
         return;
       }
 
-      // -----------------------------------------------------------
+      debugPrint('================================');
+      debugPrint('QUERYING GTA 6 PRO PRODUCT');
+      debugPrint('Product ID: $productId');
+      debugPrint('================================');
+
+      // -------------------------------------------------------------
+      // ONLY ONE queryProductDetails() CAN RUN
+      // -------------------------------------------------------------
+
+      final ProductDetailsResponse response =
+          await _iap.queryProductDetails(
+        <String>{productId},
+      );
+
+      // -------------------------------------------------------------
+      // ERROR
+      // -------------------------------------------------------------
+
+      if (response.error != null) {
+        debugPrint(
+          'Product query error: ${response.error}',
+        );
+
+        errorMessage = response.error!.message;
+
+        notifyListeners();
+
+        return;
+      }
+
+      // -------------------------------------------------------------
       // PRODUCT NOT FOUND
-      // -----------------------------------------------------------
+      // -------------------------------------------------------------
 
       if (response.notFoundIDs.contains(productId)) {
         debugPrint(
-          'Product not found: $productId',
+          'GTA 6 PRO product not found: $productId',
         );
 
         errorMessage =
             'GTA 6 PRO is not available yet.';
 
         notifyListeners();
+
         return;
       }
 
-      // -----------------------------------------------------------
+      // -------------------------------------------------------------
       // PRODUCT FOUND
-      // -----------------------------------------------------------
+      // -------------------------------------------------------------
 
-      if (response.productDetails.isNotEmpty) {
-        premiumProduct =
-            response.productDetails.first;
-
+      if (response.productDetails.isEmpty) {
         debugPrint(
-          'GTA 6 PRO product loaded successfully.',
+          'Google Play returned zero product details.',
         );
 
-        debugPrint(
-          'Product ID: ${premiumProduct!.id}',
-        );
-
-        debugPrint(
-          'Product title: ${premiumProduct!.title}',
-        );
-
-        debugPrint(
-          'Product price: ${premiumProduct!.price}',
-        );
-
-        errorMessage = null;
+        errorMessage =
+            'GTA 6 PRO is not available yet.';
 
         notifyListeners();
 
         return;
       }
 
-      // -----------------------------------------------------------
-      // EMPTY RESPONSE
-      // -----------------------------------------------------------
+      // Use exact matching product instead of blindly taking
+      // the first product returned.
+      ProductDetails? foundProduct;
 
-      debugPrint(
-        'Google Play returned no product details.',
-      );
+      for (final ProductDetails product
+          in response.productDetails) {
+        if (product.id == productId) {
+          foundProduct = product;
+          break;
+        }
+      }
 
-      errorMessage =
-          'GTA 6 PRO is not available yet.';
+      if (foundProduct == null) {
+        debugPrint(
+          'Requested product was not present in response.',
+        );
+
+        errorMessage =
+            'GTA 6 PRO is not available yet.';
+
+        notifyListeners();
+
+        return;
+      }
+
+      premiumProduct = foundProduct;
+
+      errorMessage = null;
+
+      debugPrint('================================');
+      debugPrint('GTA 6 PRO PRODUCT LOADED');
+      debugPrint('ID: ${premiumProduct!.id}');
+      debugPrint('Title: ${premiumProduct!.title}');
+      debugPrint('Price: ${premiumProduct!.price}');
+      debugPrint('================================');
 
       notifyListeners();
-
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint(
         'Product loading exception: $e',
+      );
+
+      debugPrintStack(
+        stackTrace: stackTrace,
       );
 
       errorMessage =
@@ -181,76 +393,183 @@ class PremiumService extends ChangeNotifier {
   // ===============================================================
 
   Future<void> buyPremium() async {
-    // Make sure the product is loaded.
-    if (premiumProduct == null) {
-      await loadProduct();
-    }
+    // -------------------------------------------------------------
+    // TEST MODE
+    // -------------------------------------------------------------
 
-    // Product still unavailable.
-    if (premiumProduct == null) {
+    if (testPremiumMode) {
+      isPremium = true;
+      isLoading = false;
+      errorMessage = null;
+
+      notifyListeners();
+
       return;
     }
 
-    // Prevent accidental duplicate purchase requests.
-    if (isLoading) {
+    // -------------------------------------------------------------
+    // DUPLICATE PURCHASE PROTECTION
+    // -------------------------------------------------------------
+
+    if (_purchaseInProgress || isLoading) {
+      debugPrint(
+        'GTA 6 PRO: purchase already running.',
+      );
+
       return;
     }
 
+    _purchaseInProgress = true;
     isLoading = true;
     errorMessage = null;
 
     notifyListeners();
 
     try {
-      final purchaseParam = PurchaseParam(
+      // -----------------------------------------------------------
+      // INITIALIZE
+      // -----------------------------------------------------------
+
+      await initialize();
+
+      if (!storeAvailable) {
+        errorMessage =
+            'Google Play Billing is unavailable.';
+
+        return;
+      }
+
+      // -----------------------------------------------------------
+      // PRODUCT
+      // -----------------------------------------------------------
+
+      if (premiumProduct == null) {
+        await loadProduct();
+      }
+
+      if (premiumProduct == null) {
+        errorMessage =
+            'GTA 6 PRO could not be loaded.';
+
+        return;
+      }
+
+      // -----------------------------------------------------------
+      // PURCHASE
+      // -----------------------------------------------------------
+
+      final PurchaseParam purchaseParam =
+          PurchaseParam(
         productDetails: premiumProduct!,
       );
 
       debugPrint(
-        'Starting GTA 6 PRO purchase...',
+        'Starting GTA 6 PRO purchase.',
       );
 
       await _iap.buyNonConsumable(
         purchaseParam: purchaseParam,
       );
 
-    } catch (e) {
+      debugPrint(
+        'Google Play purchase request sent.',
+      );
+    } catch (e, stackTrace) {
       debugPrint(
         'Purchase launch error: $e',
       );
 
-      isLoading = false;
+      debugPrintStack(
+        stackTrace: stackTrace,
+      );
 
       errorMessage =
           'Unable to start the purchase.';
+    } finally {
+      //
+      // IMPORTANT:
+      //
+      // Don't keep the button permanently locked.
+      //
+      // The purchase stream will handle the actual
+      // purchased/pending/error state.
+      //
+      _purchaseInProgress = false;
+      isLoading = false;
 
       notifyListeners();
     }
   }
 
   // ===============================================================
-  // RESTORE PURCHASE
+  // RESTORE PURCHASES
   // ===============================================================
 
-  Future<void> restorePurchases() async {
-    try {
-      isLoading = true;
+  Future<void> restorePurchases() {
+    if (testPremiumMode) {
+      isPremium = true;
+      isLoading = false;
       errorMessage = null;
 
       notifyListeners();
 
+      return Future.value();
+    }
+
+    // Prevent simultaneous restore calls.
+    if (_restoreFuture != null) {
       debugPrint(
-        'Restoring GTA 6 PRO purchase...',
+        'GTA 6 PRO: restore already running.',
+      );
+
+      return _restoreFuture!;
+    }
+
+    final future = _restorePurchasesInternal();
+
+    _restoreFuture = future;
+
+    future.whenComplete(() {
+      if (identical(_restoreFuture, future)) {
+        _restoreFuture = null;
+      }
+    });
+
+    return future;
+  }
+
+  Future<void> _restorePurchasesInternal() async {
+    try {
+      if (!storeAvailable) {
+        storeAvailable = await _iap.isAvailable();
+      }
+
+      if (!storeAvailable) {
+        errorMessage =
+            'Google Play Billing is unavailable.';
+
+        notifyListeners();
+
+        return;
+      }
+
+      debugPrint(
+        'Restoring GTA 6 PRO purchases...',
       );
 
       await _iap.restorePurchases();
 
-    } catch (e) {
+      debugPrint(
+        'GTA 6 PRO restore request completed.',
+      );
+    } catch (e, stackTrace) {
       debugPrint(
         'Restore error: $e',
       );
 
-      isLoading = false;
+      debugPrintStack(
+        stackTrace: stackTrace,
+      );
 
       errorMessage =
           'Unable to restore your purchase.';
@@ -266,9 +585,12 @@ class PremiumService extends ChangeNotifier {
   void _handlePurchaseUpdates(
     List<PurchaseDetails> purchases,
   ) {
-    for (final purchase in purchases) {
+    for (final PurchaseDetails purchase
+        in purchases) {
+      // -----------------------------------------------------------
+      // IGNORE OTHER PRODUCTS
+      // -----------------------------------------------------------
 
-      // Ignore products that aren't GTA 6 PRO.
       if (purchase.productID != productId) {
         continue;
       }
@@ -279,7 +601,6 @@ class PremiumService extends ChangeNotifier {
       );
 
       switch (purchase.status) {
-
         // ---------------------------------------------------------
         // PENDING
         // ---------------------------------------------------------
@@ -288,6 +609,7 @@ class PremiumService extends ChangeNotifier {
           isLoading = true;
 
           notifyListeners();
+
           break;
 
         // ---------------------------------------------------------
@@ -300,6 +622,7 @@ class PremiumService extends ChangeNotifier {
           );
 
           _unlockPremium();
+
           break;
 
         // ---------------------------------------------------------
@@ -312,6 +635,7 @@ class PremiumService extends ChangeNotifier {
           );
 
           _unlockPremium();
+
           break;
 
         // ---------------------------------------------------------
@@ -325,12 +649,14 @@ class PremiumService extends ChangeNotifier {
           );
 
           isLoading = false;
+          _purchaseInProgress = false;
 
           errorMessage =
               purchase.error?.message ??
               'Purchase failed.';
 
           notifyListeners();
+
           break;
 
         // ---------------------------------------------------------
@@ -343,10 +669,11 @@ class PremiumService extends ChangeNotifier {
           );
 
           isLoading = false;
-
+          _purchaseInProgress = false;
           errorMessage = null;
 
           notifyListeners();
+
           break;
 
         default:
@@ -358,7 +685,9 @@ class PremiumService extends ChangeNotifier {
       // -----------------------------------------------------------
 
       if (purchase.pendingCompletePurchase) {
-        _completePurchase(purchase);
+        unawaited(
+          _completePurchase(purchase),
+        );
       }
     }
   }
@@ -378,10 +707,13 @@ class PremiumService extends ChangeNotifier {
       debugPrint(
         'GTA 6 PRO purchase completed.',
       );
-
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint(
         'Complete purchase error: $e',
+      );
+
+      debugPrintStack(
+        stackTrace: stackTrace,
       );
     }
   }
@@ -394,20 +726,27 @@ class PremiumService extends ChangeNotifier {
     isPremium = true;
 
     isLoading = false;
+    _purchaseInProgress = false;
 
     errorMessage = null;
 
-    debugPrint(
-      '================================',
-    );
+    debugPrint('================================');
+    debugPrint('GTA 6 PRO UNLOCKED');
+    debugPrint('================================');
 
-    debugPrint(
-      'GTA 6 PRO UNLOCKED',
-    );
+    notifyListeners();
+  }
 
-    debugPrint(
-      '================================',
-    );
+  // ===============================================================
+  // MANUAL PREMIUM CONTROL
+  // ===============================================================
+
+  void setPremium(bool value) {
+    isPremium = value;
+
+    if (value) {
+      errorMessage = null;
+    }
 
     notifyListeners();
   }
@@ -418,7 +757,16 @@ class PremiumService extends ChangeNotifier {
 
   @override
   void dispose() {
+    debugPrint(
+      'GTA 6 PRO: disposing PremiumService.',
+    );
+
     _purchaseSubscription?.cancel();
+    _purchaseSubscription = null;
+
+    _initializeFuture = null;
+    _loadProductFuture = null;
+    _restoreFuture = null;
 
     super.dispose();
   }

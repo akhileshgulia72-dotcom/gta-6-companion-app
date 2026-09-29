@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:gta_6_comapnion_app/services/premium_state.dart';
+import 'package:gta_6_comapnion_app/services/ad_manager.dart';
 import 'news_model.dart';
 import 'news_service.dart';
 
@@ -39,21 +40,22 @@ class _NewsScreenState extends State<NewsScreen> {
   ];
 
   // ============================================================
-  // ADMOB BANNER
+  // ADMOB NATIVE ADS
   // ============================================================
 
-  // Each ad position gets its own BannerAd instance.
-  // Reusing the same AdWidget in multiple places causes:
-  // "This AdWidget is already in the Widget Tree".
-  final List<BannerAd?> _bannerAds = [];
+  final List<NativeAd?> _nativeAds = [];
 
-  // Google official TEST banner ID.
-  //
-  // IMPORTANT:
-  // Replace this with your real News Banner Ad Unit ID
-  // before production release.
-  static const String _bannerAdUnitId =
-      'ca-app-pub-7694497723149363/2711425799';
+  // Tracks which ad positions are actually loaded.
+  final Set<int> _loadedNativeAds = {};
+
+  // Prevents old/disposed ad callbacks from affecting new ads.
+  int _nativeAdGeneration = 0;
+
+  // Every 5th news tap shows an interstitial.
+  int _newsTapCount = 0;
+
+  static const String _nativeAdUnitId =
+      'ca-app-pub-7694497723149363/4612546853';
 
   // ============================================================
   // INIT
@@ -62,11 +64,7 @@ class _NewsScreenState extends State<NewsScreen> {
   @override
   void initState() {
     super.initState();
-
     _loadNews();
-
-    // Banner ads are prepared after the news list is loaded,
-    // because we need one unique BannerAd for every 3 cards.
   }
 
   // ============================================================
@@ -88,7 +86,9 @@ class _NewsScreenState extends State<NewsScreen> {
       _applyCategoryFilter();
 
       if (!premiumState.isPremium) {
-        _prepareBannerAds();
+        _prepareNativeAds();
+      } else {
+        _disposeNativeAds();
       }
 
       if (!mounted) return;
@@ -119,21 +119,24 @@ class _NewsScreenState extends State<NewsScreen> {
       _filteredNews = _allNews
           .where(
             (news) =>
-                news.category.toLowerCase() == _selectedCategory.toLowerCase(),
+                news.category.toLowerCase() ==
+                _selectedCategory.toLowerCase(),
           )
           .toList();
     }
   }
 
   void _selectCategory(String category) {
-    _selectedCategory = category;
-    _applyCategoryFilter();
+    if (_selectedCategory == category) return;
+
+    setState(() {
+      _selectedCategory = category;
+      _applyCategoryFilter();
+    });
 
     if (!premiumState.isPremium) {
-      _prepareBannerAds();
+      _prepareNativeAds();
     }
-
-    setState(() {});
   }
 
   // ============================================================
@@ -142,9 +145,13 @@ class _NewsScreenState extends State<NewsScreen> {
 
   News? get _featuredNews {
     try {
-      return _allNews.firstWhere((news) => news.isFeatured);
+      return _allNews.firstWhere(
+        (news) => news.isFeatured,
+      );
     } catch (_) {
-      return _allNews.isNotEmpty ? _allNews.first : null;
+      return _allNews.isNotEmpty
+          ? _allNews.first
+          : null;
     }
   }
 
@@ -183,134 +190,198 @@ class _NewsScreenState extends State<NewsScreen> {
   // ============================================================
 
   void _openArticle(News news) {
+    if (premiumState.isPremium) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => NewsDetailsScreen(news: news),
+        ),
+      );
+      return;
+    }
+
+    _newsTapCount++;
+    debugPrint('NEWS TAP COUNT: $_newsTapCount');
+
+    if (_newsTapCount >= 5) {
+      _newsTapCount = 0;
+
+      AdManager.showInterstitial(
+        onFinished: () {
+          if (!mounted) return;
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => NewsDetailsScreen(news: news),
+            ),
+          );
+        },
+      );
+      return;
+    }
+
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => NewsDetailsScreen(news: news)),
+      MaterialPageRoute(
+        builder: (_) => NewsDetailsScreen(news: news),
+      ),
     );
   }
 
   // ============================================================
-  // ADMOB - PREPARE BANNERS
+  // PREPARE NATIVE ADS
   // ============================================================
 
-  void _prepareBannerAds() {
-    // Premium users should never load or display news ads.
+  void _prepareNativeAds() {
+    _disposeNativeAds();
+
     if (premiumState.isPremium) {
-      _disposeBannerAds();
       return;
     }
 
-    _disposeBannerAds();
+    final int generation = _nativeAdGeneration;
 
-    // One ad after every 3 news cards:
-    // 3 cards -> 1 ad
-    // 6 cards -> 2 ads
-    // 9 cards -> 3 ads
-    final adCount = _filteredNews.length ~/ 3;
+    // One ad after every 3 news cards.
+    //
+    // 3 news  = 1 ad
+    // 6 news  = 2 ads
+    // 9 news  = 3 ads
+    final int adCount = _filteredNews.length ~/ 3;
+
+    // Create empty positions.
+    _nativeAds.addAll(
+      List<NativeAd?>.filled(
+        adCount,
+        null,
+      ),
+    );
 
     for (int i = 0; i < adCount; i++) {
-      final ad = BannerAd(
-        adUnitId: _bannerAdUnitId,
-        size: AdSize.banner,
+      final NativeAd nativeAd = NativeAd(
+        adUnitId: _nativeAdUnitId,
+        factoryId: 'newsNativeAd',
         request: const AdRequest(),
-        listener: BannerAdListener(
+        listener: NativeAdListener(
           onAdLoaded: (ad) {
-            debugPrint('NEWS BANNER ${i + 1} LOADED');
+            // Ignore old callbacks.
+            if (!mounted ||
+                generation != _nativeAdGeneration) {
+              ad.dispose();
+              return;
+            }
 
-            if (!mounted) return;
+            if (i >= _nativeAds.length) {
+              ad.dispose();
+              return;
+            }
 
-            setState(() {});
+            final loadedAd = ad as NativeAd;
+
+            // Replace only this position.
+            _nativeAds[i]?.dispose();
+
+            _nativeAds[i] = loadedAd;
+            _loadedNativeAds.add(i);
+
+            debugPrint(
+              'NEWS NATIVE ${i + 1} LOADED',
+            );
+
+            if (mounted) {
+              setState(() {});
+            }
           },
           onAdFailedToLoad: (ad, error) {
-            debugPrint('NEWS BANNER ${i + 1} FAILED: ${error.message}');
-
-            final failedIndex = _bannerAds.indexOf(ad as BannerAd?);
+            debugPrint(
+              'NEWS NATIVE ${i + 1} FAILED: '
+              '${error.message}',
+            );
 
             ad.dispose();
 
-            if (failedIndex != -1) {
-              _bannerAds[failedIndex] = null;
+            if (!mounted ||
+                generation != _nativeAdGeneration) {
+              return;
             }
 
-            if (!mounted) return;
+            if (i < _nativeAds.length) {
+              _nativeAds[i] = null;
+              _loadedNativeAds.remove(i);
+            }
 
-            setState(() {});
+            if (mounted) {
+              setState(() {});
+            }
           },
         ),
       );
 
-      _bannerAds.add(ad);
-      ad.load();
+      nativeAd.load();
     }
   }
 
   // ============================================================
-  // ADMOB - BANNER WIDGET
+  // NATIVE AD WIDGET
   // ============================================================
 
-  Widget _buildNewsBannerAd(int adIndex) {
+  Widget _buildNewsNativeAd(int adIndex) {
     if (premiumState.isPremium) {
       return const SizedBox.shrink();
     }
 
-    if (adIndex < 0 || adIndex >= _bannerAds.length) {
+    if (adIndex < 0 ||
+        adIndex >= _nativeAds.length) {
       return const SizedBox.shrink();
     }
 
-    final ad = _bannerAds[adIndex];
+    // DO NOT show AdWidget before loading.
+    if (!_loadedNativeAds.contains(adIndex)) {
+      return const SizedBox.shrink();
+    }
+
+    final NativeAd? ad = _nativeAds[adIndex];
 
     if (ad == null) {
       return const SizedBox.shrink();
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 12,
+      ),
+      child: SizedBox(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        decoration: BoxDecoration(
-          color: const Color(0xFF181818),
+        height: 300,
+        child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          children: [
-            const Text(
-              'ADVERTISEMENT',
-              style: TextStyle(
-                color: Colors.white30,
-                fontSize: 9,
-                letterSpacing: 1,
-              ),
-            ),
-
-            const SizedBox(height: 4),
-
-            SizedBox(
-              width: ad.size.width.toDouble(),
-              height: ad.size.height.toDouble(),
-              child: AdWidget(ad: ad),
-            ),
-          ],
+          child: AdWidget(
+            ad: ad,
+          ),
         ),
       ),
     );
   }
 
   // ============================================================
-  // DISPOSE
+  // DISPOSE NATIVE ADS
   // ============================================================
 
-  void _disposeBannerAds() {
-    for (final ad in _bannerAds) {
+  void _disposeNativeAds() {
+    // Invalidate all previous callbacks.
+    _nativeAdGeneration++;
+
+    for (final ad in _nativeAds) {
       ad?.dispose();
     }
 
-    _bannerAds.clear();
+    _nativeAds.clear();
+    _loadedNativeAds.clear();
   }
 
   @override
   void dispose() {
-    _disposeBannerAds();
+    _disposeNativeAds();
     super.dispose();
   }
 
@@ -322,12 +393,10 @@ class _NewsScreenState extends State<NewsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
-
       appBar: AppBar(
         backgroundColor: const Color(0xFF121212),
         elevation: 0,
         centerTitle: false,
-
         title: Text(
           'LATEST NEWS',
           style: GoogleFonts.orbitron(
@@ -336,16 +405,16 @@ class _NewsScreenState extends State<NewsScreen> {
             letterSpacing: 1.5,
           ),
         ),
-
         actions: [
           IconButton(
             onPressed: _loadNews,
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(
+              Icons.refresh,
+            ),
             tooltip: 'Refresh',
           ),
         ],
       ),
-
       body: RefreshIndicator(
         color: Colors.pink,
         backgroundColor: const Color(0xFF1A1A1A),
@@ -369,8 +438,11 @@ class _NewsScreenState extends State<NewsScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         children: const [
           SizedBox(height: 250),
-
-          Center(child: CircularProgressIndicator(color: Colors.pink)),
+          Center(
+            child: CircularProgressIndicator(
+              color: Colors.pink,
+            ),
+          ),
         ],
       );
     }
@@ -383,29 +455,34 @@ class _NewsScreenState extends State<NewsScreen> {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(24),
-
         children: [
           const SizedBox(height: 180),
-
-          const Icon(Icons.cloud_off, size: 60, color: Colors.white54),
-
+          const Icon(
+            Icons.cloud_off,
+            size: 60,
+            color: Colors.white54,
+          ),
           const SizedBox(height: 20),
-
           Center(
             child: Text(
               _error!,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white70, fontSize: 16),
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 16,
+              ),
             ),
           ),
-
           const SizedBox(height: 20),
-
           Center(
             child: ElevatedButton.icon(
               onPressed: _loadNews,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Try Again'),
+              icon: const Icon(
+                Icons.refresh,
+              ),
+              label: const Text(
+                'Try Again',
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.pink,
                 foregroundColor: Colors.white,
@@ -425,7 +502,6 @@ class _NewsScreenState extends State<NewsScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         children: const [
           SizedBox(height: 220),
-
           Center(
             child: Icon(
               Icons.article_outlined,
@@ -433,75 +509,69 @@ class _NewsScreenState extends State<NewsScreen> {
               color: Colors.white38,
             ),
           ),
-
           SizedBox(height: 15),
-
           Center(
             child: Text(
               'No news available yet.',
-              style: TextStyle(color: Colors.white70, fontSize: 17),
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 17,
+              ),
             ),
           ),
         ],
       );
     }
 
+    final featured = _featuredNews;
+
     // ----------------------------------------------------------
     // NEWS BODY
     // ----------------------------------------------------------
 
-    final featured = _featuredNews;
-
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.only(bottom: 30),
-
+      padding: const EdgeInsets.only(
+        bottom: 30,
+      ),
       children: [
-        // ------------------------------------------------------
         // FEATURED
-        // ------------------------------------------------------
         if (featured != null) ...[
           _sectionTitle('FEATURED'),
-
           _buildFeaturedCard(featured),
         ],
 
         const SizedBox(height: 20),
 
-        // ------------------------------------------------------
         // CATEGORIES
-        // ------------------------------------------------------
         _sectionTitle('CATEGORIES'),
-
         _buildCategorySelector(),
 
         const SizedBox(height: 20),
 
-        // ------------------------------------------------------
         // NEWS HEADER
-        // ------------------------------------------------------
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-
+          padding: const EdgeInsets.symmetric(
+            horizontal: 16,
+          ),
           child: Row(
             children: [
               Text(
                 _selectedCategory == 'All'
                     ? 'ALL NEWS'
                     : _selectedCategory.toUpperCase(),
-
                 style: GoogleFonts.orbitron(
                   fontSize: 17,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-
               const Spacer(),
-
               Text(
                 '${_filteredNews.length} articles',
-
-                style: const TextStyle(color: Colors.white54, fontSize: 13),
+                style: const TextStyle(
+                  color: Colors.white54,
+                  fontSize: 13,
+                ),
               ),
             ],
           ),
@@ -509,32 +579,31 @@ class _NewsScreenState extends State<NewsScreen> {
 
         const SizedBox(height: 10),
 
-        // ------------------------------------------------------
-        // NEWS LIST + ADS
-        // ------------------------------------------------------
+        // NEWS LIST + NATIVE ADS
         if (_filteredNews.isEmpty)
           _buildNoCategoryNews()
         else
-          ...List.generate(_filteredNews.length, (index) {
-            final news = _filteredNews[index];
+          ...List.generate(
+            _filteredNews.length,
+            (index) {
+              final news = _filteredNews[index];
 
-            return Column(
-              children: [
-                _buildNewsCard(news),
+              return Column(
+                children: [
+                  _buildNewsCard(news),
 
-                // Show a unique banner after every 3 cards.
-                //
-                // index 0 = card 1
-                // index 1 = card 2
-                // index 2 = card 3 -> AD #1
-                //
-                // index 5 = card 6 -> AD #2
-                // index 8 = card 9 -> AD #3
-                if ((index + 1) % 3 == 0)
-                  _buildNewsBannerAd((index + 1) ~/ 3 - 1),
-              ],
-            );
-          }),
+                  // Native ad after:
+                  // News 3 -> Ad 1
+                  // News 6 -> Ad 2
+                  // News 9 -> Ad 3
+                  if ((index + 1) % 3 == 0)
+                    _buildNewsNativeAd(
+                      (index + 1) ~/ 3 - 1,
+                    ),
+                ],
+              );
+            },
+          ),
       ],
     );
   }
@@ -545,11 +614,14 @@ class _NewsScreenState extends State<NewsScreen> {
 
   Widget _sectionTitle(String title) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-
+      padding: const EdgeInsets.fromLTRB(
+        16,
+        10,
+        16,
+        12,
+      ),
       child: Text(
         title,
-
         style: GoogleFonts.orbitron(
           fontSize: 13,
           fontWeight: FontWeight.bold,
@@ -567,51 +639,55 @@ class _NewsScreenState extends State<NewsScreen> {
   Widget _buildCategorySelector() {
     return SizedBox(
       height: 42,
-
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-
+        padding: const EdgeInsets.symmetric(
+          horizontal: 16,
+        ),
         itemCount: _categories.length,
-
         separatorBuilder: (_, __) {
-          return const SizedBox(width: 8);
+          return const SizedBox(
+            width: 8,
+          );
         },
-
         itemBuilder: (context, index) {
           final category = _categories[index];
 
-          final selected = category == _selectedCategory;
+          final selected =
+              category == _selectedCategory;
 
           return GestureDetector(
             onTap: () {
               _selectCategory(category);
             },
-
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-
-              padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 10),
-
+              duration: const Duration(
+                milliseconds: 200,
+              ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 17,
+                vertical: 10,
+              ),
               decoration: BoxDecoration(
-                color: selected ? Colors.pink : const Color(0xFF1E1E1E),
-
-                borderRadius: BorderRadius.circular(22),
-
+                color: selected
+                    ? Colors.pink
+                    : const Color(0xFF1E1E1E),
+                borderRadius: BorderRadius.circular(
+                  22,
+                ),
                 border: Border.all(
-                  color: selected ? Colors.pink : Colors.white12,
+                  color: selected
+                      ? Colors.pink
+                      : Colors.white12,
                 ),
               ),
-
               child: Text(
                 category,
-
                 style: TextStyle(
-                  color: selected ? Colors.white : Colors.white70,
-
+                  color: selected
+                      ? Colors.white
+                      : Colors.white70,
                   fontWeight: FontWeight.bold,
-
                   fontSize: 13,
                 ),
               ),
@@ -631,69 +707,67 @@ class _NewsScreenState extends State<NewsScreen> {
       onTap: () {
         _openArticle(news);
       },
-
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16),
-
+        margin: const EdgeInsets.symmetric(
+          horizontal: 16,
+        ),
         height: 260,
-
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(22),
-
+          borderRadius: BorderRadius.circular(
+            22,
+          ),
           color: const Color(0xFF1D1D1D),
-
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.4),
-
+              color: Colors.black.withOpacity(
+                0.4,
+              ),
               blurRadius: 15,
-
-              offset: const Offset(0, 8),
+              offset: const Offset(
+                0,
+                8,
+              ),
             ),
           ],
         ),
-
         clipBehavior: Clip.antiAlias,
-
         child: Stack(
           fit: StackFit.expand,
-
           children: [
-            _buildImage(news.imageUrl, height: 260),
+            _buildImage(
+              news.imageUrl,
+              height: 260,
+            ),
 
-            // Dark gradient
             Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
-
                   end: Alignment.bottomCenter,
-
-                  colors: [Colors.transparent, Color(0xEE000000)],
+                  colors: [
+                    Colors.transparent,
+                    Color(0xEE000000),
+                  ],
                 ),
               ),
             ),
 
-            // Featured badge
             Positioned(
               top: 14,
               left: 14,
-
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
                   vertical: 7,
                 ),
-
                 decoration: BoxDecoration(
                   color: Colors.pink,
-
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(
+                    20,
+                  ),
                 ),
-
                 child: const Text(
                   'FEATURED',
-
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 11,
@@ -703,15 +777,13 @@ class _NewsScreenState extends State<NewsScreen> {
               ),
             ),
 
-            // Featured content
             Positioned(
               left: 16,
               right: 16,
               bottom: 16,
-
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
                 children: [
                   _categoryBadge(news.category),
 
@@ -719,11 +791,8 @@ class _NewsScreenState extends State<NewsScreen> {
 
                   Text(
                     news.title,
-
                     maxLines: 2,
-
                     overflow: TextOverflow.ellipsis,
-
                     style: GoogleFonts.orbitron(
                       color: Colors.white,
                       fontSize: 19,
@@ -738,11 +807,9 @@ class _NewsScreenState extends State<NewsScreen> {
                       Expanded(
                         child: Text(
                           news.source,
-
                           maxLines: 1,
-
-                          overflow: TextOverflow.ellipsis,
-
+                          overflow:
+                              TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: Colors.white70,
                             fontSize: 12,
@@ -752,13 +819,19 @@ class _NewsScreenState extends State<NewsScreen> {
 
                       const SizedBox(width: 8),
 
-                      const Text('•', style: TextStyle(color: Colors.white54)),
+                      const Text(
+                        '•',
+                        style: TextStyle(
+                          color: Colors.white54,
+                        ),
+                      ),
 
                       const SizedBox(width: 8),
 
                       Text(
-                        _formatDate(news.publishedAt),
-
+                        _formatDate(
+                          news.publishedAt,
+                        ),
                         style: const TextStyle(
                           color: Colors.white70,
                           fontSize: 12,
@@ -784,40 +857,43 @@ class _NewsScreenState extends State<NewsScreen> {
       onTap: () {
         _openArticle(news);
       },
-
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
-
+        margin: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 7,
+        ),
         decoration: BoxDecoration(
           color: const Color(0xFF1A1A1A),
-
-          borderRadius: BorderRadius.circular(18),
-
-          border: Border.all(color: Colors.white10),
+          borderRadius: BorderRadius.circular(
+            18,
+          ),
+          border: Border.all(
+            color: Colors.white10,
+          ),
         ),
-
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
           children: [
-            // Image
             ClipRRect(
-              borderRadius: const BorderRadius.only(
+              borderRadius:
+                  const BorderRadius.only(
                 topLeft: Radius.circular(18),
                 bottomLeft: Radius.circular(18),
               ),
-
-              child: _buildImage(news.imageUrl, width: 120, height: 125),
+              child: _buildImage(
+                news.imageUrl,
+                width: 120,
+                height: 125,
+              ),
             ),
 
-            // Content
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(13),
-
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
                   children: [
                     _categoryBadge(news.category),
 
@@ -825,11 +901,8 @@ class _NewsScreenState extends State<NewsScreen> {
 
                     Text(
                       news.title,
-
                       maxLines: 3,
-
                       overflow: TextOverflow.ellipsis,
-
                       style: GoogleFonts.poppins(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
@@ -841,11 +914,8 @@ class _NewsScreenState extends State<NewsScreen> {
 
                     Text(
                       news.description,
-
                       maxLines: 2,
-
                       overflow: TextOverflow.ellipsis,
-
                       style: const TextStyle(
                         fontSize: 12,
                         color: Colors.white60,
@@ -860,11 +930,9 @@ class _NewsScreenState extends State<NewsScreen> {
                         Expanded(
                           child: Text(
                             news.source,
-
                             maxLines: 1,
-
-                            overflow: TextOverflow.ellipsis,
-
+                            overflow:
+                                TextOverflow.ellipsis,
                             style: const TextStyle(
                               fontSize: 11,
                               color: Colors.white54,
@@ -873,8 +941,9 @@ class _NewsScreenState extends State<NewsScreen> {
                         ),
 
                         Text(
-                          _formatDate(news.publishedAt),
-
+                          _formatDate(
+                            news.publishedAt,
+                          ),
                           style: const TextStyle(
                             fontSize: 11,
                             color: Colors.white54,
@@ -896,35 +965,37 @@ class _NewsScreenState extends State<NewsScreen> {
   // IMAGE
   // ============================================================
 
-  Widget _buildImage(String? imageUrl, {double? width, double? height}) {
-    if (imageUrl == null || imageUrl.trim().isEmpty) {
+  Widget _buildImage(
+    String? imageUrl, {
+    double? width,
+    double? height,
+  }) {
+    if (imageUrl == null ||
+        imageUrl.trim().isEmpty) {
       return Container(
         width: width,
         height: height,
-
         color: const Color(0xFF242424),
-
         child: const Center(
-          child: Icon(Icons.article, color: Colors.white30, size: 42),
+          child: Icon(
+            Icons.article,
+            color: Colors.white30,
+            size: 42,
+          ),
         ),
       );
     }
 
     return Image.network(
       imageUrl,
-
       width: width,
       height: height,
-
       fit: BoxFit.cover,
-
       errorBuilder: (_, __, ___) {
         return Container(
           width: width,
           height: height,
-
           color: const Color(0xFF242424),
-
           child: const Center(
             child: Icon(
               Icons.broken_image_outlined,
@@ -934,8 +1005,11 @@ class _NewsScreenState extends State<NewsScreen> {
           ),
         );
       },
-
-      loadingBuilder: (context, child, loadingProgress) {
+      loadingBuilder: (
+        context,
+        child,
+        loadingProgress,
+      ) {
         if (loadingProgress == null) {
           return child;
         }
@@ -943,9 +1017,7 @@ class _NewsScreenState extends State<NewsScreen> {
         return Container(
           width: width,
           height: height,
-
           color: const Color(0xFF242424),
-
           child: const Center(
             child: CircularProgressIndicator(
               strokeWidth: 2,
@@ -963,17 +1035,20 @@ class _NewsScreenState extends State<NewsScreen> {
 
   Widget _categoryBadge(String category) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-
-      decoration: BoxDecoration(
-        color: Colors.pink.withOpacity(0.15),
-
-        borderRadius: BorderRadius.circular(8),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 9,
+        vertical: 5,
       ),
-
+      decoration: BoxDecoration(
+        color: Colors.pink.withOpacity(
+          0.15,
+        ),
+        borderRadius: BorderRadius.circular(
+          8,
+        ),
+      ),
       child: Text(
         category.toUpperCase(),
-
         style: const TextStyle(
           color: Colors.pink,
           fontSize: 9,
@@ -990,18 +1065,25 @@ class _NewsScreenState extends State<NewsScreen> {
 
   Widget _buildNoCategoryNews() {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 80),
-
+      padding: const EdgeInsets.symmetric(
+        vertical: 80,
+      ),
       child: Column(
         children: [
-          const Icon(Icons.filter_alt_off, size: 50, color: Colors.white30),
+          const Icon(
+            Icons.filter_alt_off,
+            size: 50,
+            color: Colors.white30,
+          ),
 
           const SizedBox(height: 12),
 
           Text(
             'No $_selectedCategory news available.',
-
-            style: const TextStyle(color: Colors.white60, fontSize: 15),
+            style: const TextStyle(
+              color: Colors.white60,
+              fontSize: 15,
+            ),
           ),
         ],
       ),
@@ -1016,21 +1098,16 @@ class _NewsScreenState extends State<NewsScreen> {
 class NewsDetailsScreen extends StatelessWidget {
   final News news;
 
-  const NewsDetailsScreen({super.key, required this.news});
-
-  // ============================================================
-  // DATE
-  // ============================================================
+  const NewsDetailsScreen({
+    super.key,
+    required this.news,
+  });
 
   String _formatDate(DateTime date) {
     return '${date.day.toString().padLeft(2, '0')}/'
         '${date.month.toString().padLeft(2, '0')}/'
         '${date.year}';
   }
-
-  // ============================================================
-  // BUILD
-  // ============================================================
 
   @override
   Widget build(BuildContext context) {
@@ -1039,12 +1116,9 @@ class NewsDetailsScreen extends StatelessWidget {
 
       appBar: AppBar(
         backgroundColor: const Color(0xFF121212),
-
         elevation: 0,
-
         title: Text(
           'NEWS',
-
           style: GoogleFonts.orbitron(
             fontSize: 18,
             fontWeight: FontWeight.bold,
@@ -1054,28 +1128,21 @@ class NewsDetailsScreen extends StatelessWidget {
 
       body: SingleChildScrollView(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
           children: [
-            // ==================================================
             // ARTICLE IMAGE
-            // ==================================================
-            if (news.imageUrl != null && news.imageUrl!.trim().isNotEmpty)
+            if (news.imageUrl != null &&
+                news.imageUrl!.trim().isNotEmpty)
               Image.network(
                 news.imageUrl!,
-
                 width: double.infinity,
-
                 height: 240,
-
                 fit: BoxFit.cover,
-
                 errorBuilder: (_, __, ___) {
                   return Container(
                     height: 240,
-
                     color: const Color(0xFF242424),
-
                     child: const Center(
                       child: Icon(
                         Icons.broken_image_outlined,
@@ -1089,42 +1156,40 @@ class NewsDetailsScreen extends StatelessWidget {
             else
               Container(
                 height: 180,
-
                 width: double.infinity,
-
                 color: const Color(0xFF242424),
-
                 child: const Center(
-                  child: Icon(Icons.article, color: Colors.white30, size: 60),
+                  child: Icon(
+                    Icons.article,
+                    color: Colors.white30,
+                    size: 60,
+                  ),
                 ),
               ),
 
-            // ==================================================
             // ARTICLE CONTENT
-            // ==================================================
             Padding(
               padding: const EdgeInsets.all(20),
-
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
                 children: [
-                  // Category
+                  // CATEGORY
                   Container(
-                    padding: const EdgeInsets.symmetric(
+                    padding:
+                        const EdgeInsets.symmetric(
                       horizontal: 10,
                       vertical: 6,
                     ),
-
                     decoration: BoxDecoration(
-                      color: Colors.pink.withOpacity(0.15),
-
-                      borderRadius: BorderRadius.circular(8),
+                      color: Colors.pink.withOpacity(
+                        0.15,
+                      ),
+                      borderRadius:
+                          BorderRadius.circular(8),
                     ),
-
                     child: Text(
                       news.category.toUpperCase(),
-
                       style: const TextStyle(
                         color: Colors.pink,
                         fontSize: 11,
@@ -1135,10 +1200,9 @@ class NewsDetailsScreen extends StatelessWidget {
 
                   const SizedBox(height: 14),
 
-                  // Title
+                  // TITLE
                   Text(
                     news.title,
-
                     style: GoogleFonts.orbitron(
                       fontSize: 23,
                       fontWeight: FontWeight.bold,
@@ -1148,21 +1212,23 @@ class NewsDetailsScreen extends StatelessWidget {
 
                   const SizedBox(height: 12),
 
-                  // Source + Date
+                  // SOURCE + DATE
                   Row(
                     children: [
-                      const Icon(Icons.source, size: 16, color: Colors.white54),
+                      const Icon(
+                        Icons.source,
+                        size: 16,
+                        color: Colors.white54,
+                      ),
 
                       const SizedBox(width: 6),
 
                       Expanded(
                         child: Text(
                           news.source,
-
                           maxLines: 1,
-
-                          overflow: TextOverflow.ellipsis,
-
+                          overflow:
+                              TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: Colors.white70,
                             fontSize: 13,
@@ -1172,13 +1238,19 @@ class NewsDetailsScreen extends StatelessWidget {
 
                       const SizedBox(width: 12),
 
-                      const Text('•', style: TextStyle(color: Colors.white30)),
+                      const Text(
+                        '•',
+                        style: TextStyle(
+                          color: Colors.white30,
+                        ),
+                      ),
 
                       const SizedBox(width: 12),
 
                       Text(
-                        _formatDate(news.publishedAt),
-
+                        _formatDate(
+                          news.publishedAt,
+                        ),
                         style: const TextStyle(
                           color: Colors.white54,
                           fontSize: 13,
@@ -1189,10 +1261,9 @@ class NewsDetailsScreen extends StatelessWidget {
 
                   const SizedBox(height: 22),
 
-                  // Description
+                  // DESCRIPTION
                   Text(
                     news.description,
-
                     style: const TextStyle(
                       color: Colors.white70,
                       fontSize: 16,
@@ -1203,14 +1274,15 @@ class NewsDetailsScreen extends StatelessWidget {
 
                   const SizedBox(height: 25),
 
-                  const Divider(color: Colors.white12),
+                  const Divider(
+                    color: Colors.white12,
+                  ),
 
                   const SizedBox(height: 20),
 
-                  // Full article
+                  // FULL ARTICLE
                   Text(
                     news.articleContent,
-
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 16,

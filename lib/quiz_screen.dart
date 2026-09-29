@@ -1,11 +1,13 @@
 import 'dart:math';
+import 'package:gta_6_comapnion_app/rewarded_ad_service.dart';
 import 'package:gta_6_comapnion_app/services/premium_state.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:gta_6_comapnion_app/main.dart';
+
 import 'package:gta_6_comapnion_app/questions.dart';
 import 'package:gta_6_comapnion_app/services/analytics_service.dart';
+
 import 'package:shared_preferences/shared_preferences.dart';
 
 class QuizScreen extends StatefulWidget {
@@ -27,9 +29,6 @@ class _QuizScreenState extends State<QuizScreen> {
 
   InterstitialAd? interstitialAd;
   bool isInterstitialReady = false;
-
-  RewardedAd? rewardedAd;
-  bool isRewardedReady = false;
 
   // ============================================================
   // QUIZ
@@ -68,7 +67,16 @@ class _QuizScreenState extends State<QuizScreen> {
   // INTERSTITIAL AD
   // ============================================================
 
+  void _onPremiumChanged() {
+    if (!premiumState.isPremium) return;
+    interstitialAd?.dispose();
+    interstitialAd = null;
+    isInterstitialReady = false;
+    if (mounted) setState(() {});
+  }
+
   void loadInterstitialAd() {
+    if (premiumState.isPremium) return;
     InterstitialAd.load(
       adUnitId:
           "ca-app-pub-7694497723149363/3436835638",
@@ -92,49 +100,15 @@ class _QuizScreenState extends State<QuizScreen> {
   // REWARDED AD
   // ============================================================
 
-  void loadRewardedAd() {
-    RewardedAd.load(
-      adUnitId:
-          "ca-app-pub-7694497723149363/4829954140",
-      request: const AdRequest(),
-      rewardedAdLoadCallback:
-          RewardedAdLoadCallback(
-        onAdLoaded: (ad) {
-          rewardedAd = ad;
-          isRewardedReady = true;
-        },
-        onAdFailedToLoad: (error) {
-          isRewardedReady = false;
-          debugPrint(
-            "Rewarded ad error: $error",
-          );
-        },
-      ),
-    );
-  }
+  Future<void> showRewardedAd() async {
+    if (!mounted) return;
 
-  void showRewardedAd() {
-    if (!isRewardedReady ||
-        rewardedAd == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            "Rewarded ad is not ready. Try again.",
-          ),
-        ),
-      );
-
-      return;
-    }
-
-    rewardedAd!.show(
-      onUserEarnedReward: (ad, reward) async {
+    await RewardedAdService.showRewardedAd(
+      onReward: () async {
         if (!mounted) return;
 
         setState(() {
           rewardClaimed = true;
-
-          // Existing reward system preserved.
           coins += 100;
         });
 
@@ -145,17 +119,38 @@ class _QuizScreenState extends State<QuizScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              "🎉 You earned 100 Coins!",
+              '🎉 You earned 100 Coins!',
             ),
           ),
         );
       },
+      onAdPreparing: () {
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Preparing your reward…',
+              ),
+            ),
+          );
+      },
+      onAdNotReady: () {
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Rewarded video is not ready yet. Please try again in a moment.',
+              ),
+            ),
+          );
+      },
     );
-
-    rewardedAd = null;
-    isRewardedReady = false;
-
-    loadRewardedAd();
   }
 
   // ============================================================
@@ -163,6 +158,7 @@ class _QuizScreenState extends State<QuizScreen> {
   // ============================================================
 
   void showInterstitialAd() {
+    if (premiumState.isPremium) return;
     if (interstitialAd == null) {
       return;
     }
@@ -813,11 +809,15 @@ if (!premiumState.isPremium &&
   void initState() {
     super.initState();
 
-    loadRewardedAd();
+    // Preload exactly one rewarded ad so Watch & Earn
+    // can usually start immediately when the user taps it.
+    RewardedAdService.preloadRewardedAd();
+
+    premiumState.addListener(_onPremiumChanged);
 
     if (!premiumState.isPremium) {
-  loadInterstitialAd();
-}
+      loadInterstitialAd();
+    }
 
     todayQuestions =
         getTodayQuestions();
@@ -839,8 +839,8 @@ if (!premiumState.isPremium &&
   @override
   void dispose() {
     interstitialAd?.dispose();
-    rewardedAd?.dispose();
 
+    premiumState.removeListener(_onPremiumChanged);
     super.dispose();
   }
 
@@ -1168,7 +1168,7 @@ if (!premiumState.isPremium &&
         Positioned.fill(
           child: Container(
             color:
-                Colors.black.withOpacity(
+                Colors.black.withValues(alpha: 
               0.65,
             ),
           ),

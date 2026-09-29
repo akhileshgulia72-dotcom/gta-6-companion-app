@@ -3,13 +3,13 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'models/gallery_model.dart';
 import 'services/gallery_service.dart';
-import 'services/premium_state.dart';
 
 class PremiumGalleryScreen extends StatefulWidget {
   const PremiumGalleryScreen({super.key});
 
   @override
-  State<PremiumGalleryScreen> createState() => _PremiumGalleryScreenState();
+  State<PremiumGalleryScreen> createState() =>
+      _PremiumGalleryScreenState();
 }
 
 class _PremiumGalleryScreenState extends State<PremiumGalleryScreen> {
@@ -25,16 +25,12 @@ class _PremiumGalleryScreenState extends State<PremiumGalleryScreen> {
     _loadGallery();
   }
 
-  // ===============================================================
-  // LOAD GALLERY
-  // ===============================================================
-
   Future<void> _loadGallery() async {
-    if (!premiumState.isPremium) {
+    if (mounted) {
       setState(() {
-        _isLoading = false;
+        _isLoading = true;
+        _error = null;
       });
-      return;
     }
 
     try {
@@ -57,10 +53,6 @@ class _PremiumGalleryScreenState extends State<PremiumGalleryScreen> {
     }
   }
 
-  // ===============================================================
-  // FULL SCREEN IMAGE
-  // ===============================================================
-
   void _openFullScreen(int index) {
     Navigator.push(
       context,
@@ -73,75 +65,10 @@ class _PremiumGalleryScreenState extends State<PremiumGalleryScreen> {
     );
   }
 
-  // ===============================================================
-  // BUILD
-  // ===============================================================
-
   @override
   Widget build(BuildContext context) {
-    // -------------------------------------------------------------
-    // PREMIUM PROTECTION
-    // -------------------------------------------------------------
-
-    if (!premiumState.isPremium) {
-      return Scaffold(
-        backgroundColor: const Color(0xFF121212),
-        appBar: AppBar(
-          backgroundColor: Colors.black,
-          foregroundColor: Colors.white,
-          title: Text(
-            'GTA 6 GALLERY',
-            style: GoogleFonts.bebasNeue(
-              fontSize: 26,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.5,
-            ),
-          ),
-        ),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(30),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.lock,
-                  color: Colors.amber,
-                  size: 70,
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  'GTA 6 PRO REQUIRED',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.bebasNeue(
-                    color: const Color(0xFFFF4DA6),
-                    fontSize: 30,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Unlock GTA 6 PRO to access the exclusive gallery.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 15,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
-
-      // ============================================================
-      // APP BAR
-      // ============================================================
 
       appBar: AppBar(
         backgroundColor: Colors.black,
@@ -157,10 +84,6 @@ class _PremiumGalleryScreenState extends State<PremiumGalleryScreen> {
         ),
       ),
 
-      // ============================================================
-      // BODY
-      // ============================================================
-
       body: RefreshIndicator(
         color: const Color(0xFFFF4DA6),
         backgroundColor: const Color(0xFF1A1A1A),
@@ -170,12 +93,7 @@ class _PremiumGalleryScreenState extends State<PremiumGalleryScreen> {
     );
   }
 
-  // ===============================================================
-  // BODY CONTENT
-  // ===============================================================
-
   Widget _buildBody() {
-    // LOADING
     if (_isLoading) {
       return const Center(
         child: CircularProgressIndicator(
@@ -184,7 +102,6 @@ class _PremiumGalleryScreenState extends State<PremiumGalleryScreen> {
       );
     }
 
-    // ERROR
     if (_error != null) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -235,7 +152,6 @@ class _PremiumGalleryScreenState extends State<PremiumGalleryScreen> {
       );
     }
 
-    // EMPTY
     if (_images.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -260,14 +176,9 @@ class _PremiumGalleryScreenState extends State<PremiumGalleryScreen> {
       );
     }
 
-    // GALLERY
     return CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
-        // ==========================================================
-        // HEADER
-        // ==========================================================
-
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(
@@ -279,7 +190,7 @@ class _PremiumGalleryScreenState extends State<PremiumGalleryScreen> {
             child: Column(
               children: [
                 Text(
-                  'EXCLUSIVE PRO COLLECTION',
+                  'GTA 6 IMAGE COLLECTION',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.bebasNeue(
                     color: const Color(0xFFFF4DA6),
@@ -290,7 +201,7 @@ class _PremiumGalleryScreenState extends State<PremiumGalleryScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  '${_images.length} exclusive images',
+                  '${_images.length} images',
                   style: const TextStyle(
                     color: Colors.white54,
                     fontSize: 13,
@@ -300,10 +211,6 @@ class _PremiumGalleryScreenState extends State<PremiumGalleryScreen> {
             ),
           ),
         ),
-
-        // ==========================================================
-        // IMAGE GRID
-        // ==========================================================
 
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(
@@ -342,11 +249,9 @@ class _PremiumGalleryScreenState extends State<PremiumGalleryScreen> {
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        // IMAGE
                         Image.network(
                           image.imageUrl,
                           fit: BoxFit.cover,
-
                           loadingBuilder:
                               (context, child, loadingProgress) {
                             if (loadingProgress == null) {
@@ -360,7 +265,6 @@ class _PremiumGalleryScreenState extends State<PremiumGalleryScreen> {
                               ),
                             );
                           },
-
                           errorBuilder:
                               (context, error, stackTrace) {
                             return const Center(
@@ -373,7 +277,6 @@ class _PremiumGalleryScreenState extends State<PremiumGalleryScreen> {
                           },
                         ),
 
-                        // DARK GRADIENT
                         Positioned(
                           left: 0,
                           right: 0,
@@ -395,32 +298,6 @@ class _PremiumGalleryScreenState extends State<PremiumGalleryScreen> {
                           ),
                         ),
 
-                        // PRO BADGE
-                        Positioned(
-                          top: 8,
-                          right: 8,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFF4DA6),
-                              borderRadius:
-                                  BorderRadius.circular(8),
-                            ),
-                            child: const Text(
-                              'PRO',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        // IMAGE NUMBER
                         Positioned(
                           left: 10,
                           bottom: 9,
@@ -453,10 +330,6 @@ class _PremiumGalleryScreenState extends State<PremiumGalleryScreen> {
     );
   }
 }
-
-// ===================================================================
-// FULL SCREEN GALLERY
-// ===================================================================
 
 class _FullScreenGallery extends StatefulWidget {
   final List<GalleryModel> images;

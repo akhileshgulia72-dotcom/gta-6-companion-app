@@ -32,3 +32,15 @@ Runner/GeneratedPluginRegistrant.*
 !default.mode2v3
 !default.pbxuser
 !default.perspectivev3
+
+# iOS signing / provisioning secrets
+*.p12
+*.mobileprovision
+*.cer
+*.p8
+
+# App Store Connect / Apple signing
+AuthKey_*.p8
+
+# Firebase iOS configuration
+GoogleService-Info.plist

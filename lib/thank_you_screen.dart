@@ -295,38 +295,7 @@ class ThankYouScreen extends StatelessWidget {
                         size: 45,
                       ),
 
-                      const SizedBox(height: 15),
-
-                      Text(
-                        "WINNER ANNOUNCEMENT",
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.orbitron(
-                          color: Colors.white,
-                          fontSize: 19,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      const Text(
-                        "11 September 2026",
-                        style: TextStyle(
-                          color: Colors.amber,
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-
-                      const SizedBox(height: 6),
-
-                      const Text(
-                        "08:00 PM (IST)",
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 16,
-                        ),
-                      ),
+                     
 
                       const SizedBox(height: 15),
 
