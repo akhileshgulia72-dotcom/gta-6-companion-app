@@ -7,17 +7,27 @@ class RewardedAdService {
   static bool _isLoading = false;
   static bool _isShowing = false;
 
-  static const String adUnitId =
-      'ca-app-pub-7694497723149363/4829954140';
+  /// Returns the correct Rewarded Ad Unit ID for the current platform.
+  ///
+  /// Android:
+  /// ca-app-pub-7694497723149363/4829954140
+  ///
+  /// iOS:
+  /// ca-app-pub-7694497723149363/9069024935
+  static String get adUnitId {
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      return 'ca-app-pub-7694497723149363/9069024935';
+    }
+
+    return 'ca-app-pub-7694497723149363/4829954140';
+  }
 
   /// Requests exactly one rewarded ad.
   ///
   /// The loaded ad stays cached until the user explicitly chooses
   /// to watch it.
   static void preloadRewardedAd() {
-    if (_rewardedAd != null ||
-        _isLoading ||
-        _isShowing) {
+    if (_rewardedAd != null || _isLoading || _isShowing) {
       return;
     }
 
@@ -53,14 +63,11 @@ class RewardedAdService {
     );
   }
 
-  static bool get isReady =>
-      _rewardedAd != null;
+  static bool get isReady => _rewardedAd != null;
 
-  static bool get isLoading =>
-      _isLoading;
+  static bool get isLoading => _isLoading;
 
-  static bool get isShowing =>
-      _isShowing;
+  static bool get isShowing => _isShowing;
 
   /// Shows the cached rewarded ad.
   ///
@@ -78,8 +85,7 @@ class RewardedAdService {
       return;
     }
 
-    if (_rewardedAd == null &&
-        !_isLoading) {
+    if (_rewardedAd == null && !_isLoading) {
       preloadRewardedAd();
     }
 
@@ -91,8 +97,7 @@ class RewardedAdService {
 
       int waitedMs = 0;
 
-      while (_isLoading &&
-          waitedMs < maxWaitMs) {
+      while (_isLoading && waitedMs < maxWaitMs) {
         await Future<void>.delayed(
           const Duration(milliseconds: pollMs),
         );
@@ -158,7 +163,6 @@ class RewardedAdService {
         _isShowing = false;
         ad.dispose();
 
-        // IMPORTANT:
         // Immediately prepare the next rewarded ad.
         // This makes the next Watch & Earn tap much faster.
         preloadRewardedAd();

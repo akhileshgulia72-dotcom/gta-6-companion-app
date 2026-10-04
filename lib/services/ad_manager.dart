@@ -6,8 +6,20 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'premium_state.dart';
 
 class AdManager {
-  static const String interstitialAdUnitId =
-      'ca-app-pub-7694497723149363/3436835638';
+  /// Returns the correct Interstitial Ad Unit ID for the current platform.
+  ///
+  /// Android:
+  /// ca-app-pub-7694497723149363/3436835638
+  ///
+  /// iOS:
+  /// ca-app-pub-7694497723149363/7755943262
+  static String get interstitialAdUnitId {
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      return 'ca-app-pub-7694497723149363/7755943262';
+    }
+
+    return 'ca-app-pub-7694497723149363/3436835638';
+  }
 
   static InterstitialAd? _interstitialAd;
   static bool _isLoadingInterstitial = false;
@@ -16,7 +28,9 @@ class AdManager {
   static int _loadFailureCount = 0;
 
   static bool get isInterstitialReady => _interstitialAd != null;
-  static bool get isInterstitialLoading => _isLoadingInterstitial;
+
+  static bool get isInterstitialLoading =>
+      _isLoadingInterstitial;
 
   static void preloadInterstitial() {
     if (premiumState.isPremium) {
@@ -32,7 +46,10 @@ class AdManager {
     }
 
     _isLoadingInterstitial = true;
-    debugPrint('AdManager: requesting interstitial...');
+
+    debugPrint(
+      'AdManager: requesting interstitial...',
+    );
 
     InterstitialAd.load(
       adUnitId: interstitialAdUnitId,
@@ -41,15 +58,23 @@ class AdManager {
         onAdLoaded: (InterstitialAd ad) {
           _isLoadingInterstitial = false;
           _loadFailureCount = 0;
+
           _interstitialAd?.dispose();
           _interstitialAd = ad;
-          debugPrint('AdManager: interstitial LOADED and READY');
+
+          debugPrint(
+            'AdManager: interstitial LOADED and READY',
+          );
         },
         onAdFailedToLoad: (LoadAdError error) {
           _isLoadingInterstitial = false;
           _interstitialAd = null;
           _loadFailureCount++;
-          debugPrint('AdManager: interstitial FAILED TO LOAD: $error');
+
+          debugPrint(
+            'AdManager: interstitial FAILED TO LOAD: $error',
+          );
+
           _scheduleRetry();
         },
       ),
@@ -67,21 +92,28 @@ class AdManager {
     }
 
     if (_isShowingInterstitial) {
-      debugPrint('AdManager: another interstitial is already showing.');
+      debugPrint(
+        'AdManager: another interstitial is already showing.',
+      );
+
       onFinished();
       return;
     }
 
-    if (_interstitialAd == null && !_isLoadingInterstitial) {
+    if (_interstitialAd == null &&
+        !_isLoadingInterstitial) {
       preloadInterstitial();
     }
 
-    final DateTime deadline = DateTime.now().add(maxWait);
+    final DateTime deadline =
+        DateTime.now().add(maxWait);
 
     while (_interstitialAd == null &&
         _isLoadingInterstitial &&
         DateTime.now().isBefore(deadline)) {
-      await Future.delayed(const Duration(milliseconds: 100));
+      await Future.delayed(
+        const Duration(milliseconds: 100),
+      );
 
       if (premiumState.isPremium) {
         _clearCachedAd();
@@ -98,12 +130,17 @@ class AdManager {
     final InterstitialAd? ad = _interstitialAd;
 
     if (ad == null) {
-      debugPrint('AdManager: interstitial not ready after wait; continuing.');
+      debugPrint(
+        'AdManager: interstitial not ready after wait; continuing.',
+      );
+
       preloadInterstitial();
       onFinished();
       return;
     }
 
+    // Remove from cache immediately.
+    // An interstitial can only be shown once.
     _interstitialAd = null;
     _isShowingInterstitial = true;
 
@@ -111,35 +148,63 @@ class AdManager {
 
     void finishNavigation() {
       if (finished) return;
+
       finished = true;
       onFinished();
     }
 
-    debugPrint('AdManager: showing interstitial...');
+    debugPrint(
+      'AdManager: showing interstitial...',
+    );
 
-    ad.fullScreenContentCallback = FullScreenContentCallback(
-      onAdShowedFullScreenContent: (InterstitialAd ad) {
-        debugPrint('AdManager: interstitial SHOWED');
+    ad.fullScreenContentCallback =
+        FullScreenContentCallback(
+      onAdShowedFullScreenContent:
+          (InterstitialAd ad) {
+        debugPrint(
+          'AdManager: interstitial SHOWED',
+        );
       },
-      onAdImpression: (InterstitialAd ad) {
-        debugPrint('AdManager: interstitial IMPRESSION');
+      onAdImpression:
+          (InterstitialAd ad) {
+        debugPrint(
+          'AdManager: interstitial IMPRESSION',
+        );
       },
-      onAdClicked: (InterstitialAd ad) {
-        debugPrint('AdManager: interstitial CLICKED');
+      onAdClicked:
+          (InterstitialAd ad) {
+        debugPrint(
+          'AdManager: interstitial CLICKED',
+        );
       },
-      onAdDismissedFullScreenContent: (InterstitialAd ad) {
-        debugPrint('AdManager: interstitial DISMISSED');
+      onAdDismissedFullScreenContent:
+          (InterstitialAd ad) {
+        debugPrint(
+          'AdManager: interstitial DISMISSED',
+        );
+
         _isShowingInterstitial = false;
+
         ad.dispose();
+
+        // Prepare the next interstitial.
         preloadInterstitial();
+
         finishNavigation();
       },
       onAdFailedToShowFullScreenContent:
           (InterstitialAd ad, AdError error) {
-        debugPrint('AdManager: interstitial FAILED TO SHOW: $error');
+        debugPrint(
+          'AdManager: interstitial FAILED TO SHOW: $error',
+        );
+
         _isShowingInterstitial = false;
+
         ad.dispose();
+
+        // Recover automatically.
         preloadInterstitial();
+
         finishNavigation();
       },
     );
@@ -148,9 +213,13 @@ class AdManager {
   }
 
   static void _scheduleRetry() {
-    if (premiumState.isPremium || (_retryTimer?.isActive ?? false)) return;
+    if (premiumState.isPremium ||
+        (_retryTimer?.isActive ?? false)) {
+      return;
+    }
 
     final int delaySeconds;
+
     if (_loadFailureCount <= 1) {
       delaySeconds = 5;
     } else if (_loadFailureCount == 2) {
@@ -162,30 +231,39 @@ class AdManager {
     }
 
     debugPrint(
-      'AdManager: retrying interstitial in ${delaySeconds}s...',
+      'AdManager: retrying interstitial in '
+      '${delaySeconds}s...',
     );
 
-    _retryTimer = Timer(Duration(seconds: delaySeconds), () {
-      _retryTimer = null;
-      if (!premiumState.isPremium) {
-        preloadInterstitial();
-      }
-    });
+    _retryTimer = Timer(
+      Duration(seconds: delaySeconds),
+      () {
+        _retryTimer = null;
+
+        if (!premiumState.isPremium) {
+          preloadInterstitial();
+        }
+      },
+    );
   }
 
   static void _clearCachedAd() {
     _retryTimer?.cancel();
     _retryTimer = null;
+
     _interstitialAd?.dispose();
     _interstitialAd = null;
+
     _isLoadingInterstitial = false;
   }
 
   static void dispose() {
     _retryTimer?.cancel();
     _retryTimer = null;
+
     _interstitialAd?.dispose();
     _interstitialAd = null;
+
     _isLoadingInterstitial = false;
     _isShowingInterstitial = false;
     _loadFailureCount = 0;
