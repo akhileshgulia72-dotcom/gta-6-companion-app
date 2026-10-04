@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:gta_6_comapnion_app/rewarded_ad_service.dart';
 import 'package:gta_6_comapnion_app/services/premium_state.dart';
+import 'package:gta_6_comapnion_app/services/ad_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -79,7 +80,7 @@ class _QuizScreenState extends State<QuizScreen> {
     if (premiumState.isPremium) return;
     InterstitialAd.load(
       adUnitId:
-          "ca-app-pub-7694497723149363/3436835638",
+          AdManager.interstitialAdUnitId,
       request: const AdRequest(),
       adLoadCallback: InterstitialAdLoadCallback(
         onAdLoaded: (ad) {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:gta_6_comapnion_app/services/premium_state.dart';
@@ -54,8 +55,10 @@ class _NewsScreenState extends State<NewsScreen> {
   // Every 5th news tap shows an interstitial.
   int _newsTapCount = 0;
 
-  static const String _nativeAdUnitId =
-      'ca-app-pub-7694497723149363/4612546853';
+  static String get _nativeAdUnitId =>
+      defaultTargetPlatform == TargetPlatform.iOS
+          ? 'ca-app-pub-7694497723149363/3677097458'
+          : 'ca-app-pub-7694497723149363/4612546853';
 
   // ============================================================
   // INIT

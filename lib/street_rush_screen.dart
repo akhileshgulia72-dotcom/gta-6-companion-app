@@ -6,6 +6,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'rewarded_ad_service.dart';
 import 'services/premium_state.dart';
+import 'services/ad_manager.dart';
 
 class StreetRushScreen extends StatefulWidget {
   const StreetRushScreen({super.key});
@@ -43,8 +44,7 @@ class _StreetRushScreenState extends State<StreetRushScreen>
   bool _interstitialShowing = false;
 
   static const int _interstitialEveryPlays = 3;
-  static const String _interstitialAdUnit =
-      'ca-app-pub-7694497723149363/3436835638';
+  static String get _interstitialAdUnit => AdManager.interstitialAdUnitId;
 
   final List<_EnemyCar> _enemies = [];
   final List<_CashPickup> _cash = [];

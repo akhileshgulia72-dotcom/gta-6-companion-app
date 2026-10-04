@@ -10,6 +10,8 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:gta_6_comapnion_app/news_model.dart';
 import 'package:gta_6_comapnion_app/services/premium_screen.dart';
 import 'package:gta_6_comapnion_app/services/premium_state.dart';
+import 'package:gta_6_comapnion_app/services/ad_manager.dart';
+import 'package:gta_6_comapnion_app/rewarded_ad_service.dart';
 
 
 import 'package:slide_countdown/slide_countdown.dart';
@@ -669,7 +671,7 @@ Widget _premiumMiniFeature(
   void loadRewardedAd() {
     if (premiumState.isPremium) return;
     RewardedAd.load(
-      adUnitId: 'ca-app-pub-7694497723149363/4829954140',
+      adUnitId: RewardedAdService.adUnitId,
       request: const AdRequest(),
       rewardedAdLoadCallback: RewardedAdLoadCallback(
         onAdLoaded: (ad) {
@@ -693,7 +695,7 @@ Widget _premiumMiniFeature(
   void loadInterstitialAd() {
     if (premiumState.isPremium) return;
   InterstitialAd.load(
-    adUnitId: "ca-app-pub-7694497723149363/3436835638",
+    adUnitId: AdManager.interstitialAdUnitId,
     request: const AdRequest(),
     adLoadCallback: InterstitialAdLoadCallback(
       onAdLoaded: (ad) {

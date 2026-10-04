@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:gta_6_comapnion_app/services/premium_cinematics_screen.dart';
@@ -13,6 +14,9 @@ class PremiumScreen extends StatefulWidget {
 }
 
 class _PremiumScreenState extends State<PremiumScreen> {
+  String get _storeName =>
+      defaultTargetPlatform == TargetPlatform.iOS ? 'App Store' : 'Google Play';
+
   List<dynamic> _previewVideos = [];
   bool _loadingVideos = true;
 
@@ -156,7 +160,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
                   ),
                   const SizedBox(width: 5),
                   Text(
-                    'Secure payment through Google Play',
+                    'Secure payment through $_storeName',
                     style: GoogleFonts.poppins(
                       color: Colors.white30,
                       fontSize: 10,
@@ -486,7 +490,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
           const SizedBox(height: 13),
           Text(
             product?.price ??
-                (premiumState.isLoading ? 'Loading price...' : 'Price shown by Google Play'),
+                (premiumState.isLoading ? 'Loading price...' : 'Price shown by $_storeName'),
             style: GoogleFonts.bebasNeue(
               color: Colors.white,
               fontSize: 42,

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -8,6 +9,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:gta_6_comapnion_app/advanced_map_screen.dart';
 
 import 'package:gta_6_comapnion_app/services/premium_state.dart';
+import 'package:gta_6_comapnion_app/services/ad_manager.dart';
 class PremiumPropertiesScreen extends StatefulWidget {
   const PremiumPropertiesScreen({super.key});
 
@@ -28,11 +30,12 @@ class _PremiumPropertiesScreenState
   // ADMOB
   // ============================================================
 
-  static const String _nativeAdUnitId =
-      'ca-app-pub-7694497723149363/4612546853';
+  static String get _nativeAdUnitId =>
+      defaultTargetPlatform == TargetPlatform.iOS
+          ? 'ca-app-pub-7694497723149363/3677097458'
+          : 'ca-app-pub-7694497723149363/4612546853';
 
-  static const String _interstitialAdUnitId =
-      'ca-app-pub-7694497723149363/3436835638';
+  static String get _interstitialAdUnitId => AdManager.interstitialAdUnitId;
 
   final List<NativeAd?> _nativeAds = [];
   final List<bool> _nativeAdLoaded = [];

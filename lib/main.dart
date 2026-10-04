@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 import 'package:gta_6_comapnion_app/services/analytics_service.dart';
 import 'package:gta_6_comapnion_app/services/auth_service.dart';
@@ -43,6 +44,15 @@ Future<void> main() async {
 }
 
 Future<void> _initializeBackgroundServices() async {
+  // Mobile Ads initialization runs after the first frame so it never delays
+  // Firebase startup or the initial UI.
+  try {
+    await MobileAds.instance.initialize();
+  } catch (e, stackTrace) {
+    debugPrint('Mobile Ads initialization failed: $e');
+    debugPrintStack(stackTrace: stackTrace);
+  }
+
   // ------------------------------------------------------------
   // SHARED PREFERENCES
   // ------------------------------------------------------------

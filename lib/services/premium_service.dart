@@ -10,6 +10,9 @@ class PremiumService extends ChangeNotifier {
 
   static const String productId = 'gta6_proo';
 
+  String get _storeName =>
+      defaultTargetPlatform == TargetPlatform.iOS ? 'App Store' : 'Google Play';
+
   // NEVER enable this in production.
   static const bool testPremiumMode = false;
 
@@ -131,7 +134,7 @@ class PremiumService extends ChangeNotifier {
         debugPrintStack(stackTrace: stackTrace);
 
         storeAvailable = false;
-        errorMessage = 'Google Play Billing is unavailable.';
+        errorMessage = '$_storeName purchases are unavailable.';
 
         notifyListeners();
 
@@ -139,11 +142,11 @@ class PremiumService extends ChangeNotifier {
       }
 
       debugPrint(
-        'Google Play Billing available: $storeAvailable',
+        '$_storeName purchases available: $storeAvailable',
       );
 
       if (!storeAvailable) {
-        errorMessage = 'Google Play Billing is unavailable.';
+        errorMessage = '$_storeName purchases are unavailable.';
 
         notifyListeners();
 
@@ -264,7 +267,7 @@ class PremiumService extends ChangeNotifier {
       }
 
       if (!storeAvailable) {
-        errorMessage = 'Google Play Billing is unavailable.';
+        errorMessage = '$_storeName purchases are unavailable.';
 
         notifyListeners();
 
@@ -324,7 +327,7 @@ class PremiumService extends ChangeNotifier {
 
       if (response.productDetails.isEmpty) {
         debugPrint(
-          'Google Play returned zero product details.',
+          '$_storeName returned zero product details.',
         );
 
         errorMessage =
@@ -433,8 +436,7 @@ class PremiumService extends ChangeNotifier {
       await initialize();
 
       if (!storeAvailable) {
-        errorMessage =
-            'Google Play Billing is unavailable.';
+        errorMessage = '$_storeName purchases are unavailable.';
 
         return;
       }
@@ -472,7 +474,7 @@ class PremiumService extends ChangeNotifier {
       );
 
       debugPrint(
-        'Google Play purchase request sent.',
+        '$_storeName purchase request sent.',
       );
     } catch (e, stackTrace) {
       debugPrint(
@@ -545,8 +547,7 @@ class PremiumService extends ChangeNotifier {
       }
 
       if (!storeAvailable) {
-        errorMessage =
-            'Google Play Billing is unavailable.';
+        errorMessage = '$_storeName purchases are unavailable.';
 
         notifyListeners();
 
