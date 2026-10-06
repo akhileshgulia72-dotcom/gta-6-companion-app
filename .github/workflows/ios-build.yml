@@ -17,7 +17,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2. Flutter
+
+      # 2. Set up Flutter
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -25,22 +26,26 @@ jobs:
           channel: stable
           cache: true
 
-      # 3. Flutter environment
+
+      # 3. Flutter doctor
       - name: Flutter doctor
         run: flutter doctor -v
 
-      # 4. Dependencies
+
+      # 4. Get Flutter dependencies
       - name: Get dependencies
         run: flutter pub get
 
-      # 5. Import Apple Distribution certificate
+
+      # 5. Import Apple Distribution Certificate
       - name: Import Apple Distribution Certificate
         uses: Apple-Actions/import-codesign-certs@v7
         with:
           p12-file-base64: ${{ secrets.APPLE_DISTRIBUTION_P12 }}
           p12-password: ${{ secrets.APPLE_DISTRIBUTION_PASSWORD }}
 
-      # 6. Download provisioning profile from Apple
+
+      # 6. Download App Store provisioning profile
       - name: Download Provisioning Profile
         uses: Apple-Actions/download-provisioning-profiles@v6
         with:
@@ -50,7 +55,8 @@ jobs:
           api-key-id: ${{ vars.APPSTORE_API_KEY_ID }}
           api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
 
-      # 7. Clean and prepare Flutter
+
+      # 7. Clean and prepare Flutter iOS build
       - name: Prepare Flutter iOS build
         run: |
           flutter clean
@@ -60,6 +66,7 @@ jobs:
             --release \
             --no-codesign \
             --build-number=${{ github.run_number }}
+
 
       # 8. Create ExportOptions.plist
       - name: Create ExportOptions.plist
@@ -102,7 +109,16 @@ jobs:
           </plist>
           EOF
 
-      # 9. Archive
+
+      # 9. Archive iOS app
+      #
+      # IMPORTANT:
+      # No CODE_SIGN_IDENTITY
+      # No CODE_SIGN_STYLE
+      # No PROVISIONING_PROFILE_SPECIFIER
+      #
+      # These are configured only on the Runner target
+      # inside project.pbxproj.
       - name: Archive iOS App
         run: |
           xcodebuild \
@@ -111,9 +127,8 @@ jobs:
             -configuration Release \
             -sdk iphoneos \
             -archivePath "$PWD/build/ios/Runner.xcarchive" \
-            DEVELOPMENT_TEAM=PR4R9G4HZ3 \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
             archive
+
 
       # 10. Export IPA
       - name: Export IPA
@@ -126,11 +141,18 @@ jobs:
             -exportOptionsPlist "$PWD/ios/ExportOptions.plist" \
             -exportPath "$PWD/build/ios/ipa"
 
-      # 11. Verify IPA
+
+      # 11. Check generated IPA
       - name: Check IPA
         run: |
           echo "Generated IPA:"
           find build/ios/ipa -name "*.ipa" -print
+
+          if ! find build/ios/ipa -name "*.ipa" -print -quit | grep -q ".ipa"; then
+            echo "ERROR: No IPA was generated."
+            exit 1
+          fi
+
 
       # 12. Upload to TestFlight
       - name: Upload to TestFlight
@@ -141,7 +163,8 @@ jobs:
           api-key-id: ${{ vars.APPSTORE_API_KEY_ID }}
           api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
 
-      # 13. Save IPA artifact
+
+      # 13. Upload IPA as GitHub artifact
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
