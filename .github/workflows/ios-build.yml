@@ -8,7 +8,7 @@ on:
 
 jobs:
   ios-build:
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 40
 
     steps:
@@ -21,7 +21,33 @@ jobs:
 
 
       # --------------------------------------------------
-      # 2. Setup Flutter
+      # 2. Select Xcode 26.6
+      # --------------------------------------------------
+      - name: Select Xcode 26.6
+        run: |
+          sudo xcode-select -s /Applications/Xcode_26.6.app
+
+          echo "========================================"
+          echo "Xcode version"
+          echo "========================================"
+
+          xcodebuild -version
+
+          echo "========================================"
+          echo "iPhoneOS SDK version"
+          echo "========================================"
+
+          xcrun --sdk iphoneos --show-sdk-version
+
+          echo "========================================"
+          echo "Xcode path"
+          echo "========================================"
+
+          xcode-select -p
+
+
+      # --------------------------------------------------
+      # 3. Setup Flutter
       # --------------------------------------------------
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -32,28 +58,28 @@ jobs:
 
 
       # --------------------------------------------------
-      # 3. Flutter Doctor
+      # 4. Flutter Doctor
       # --------------------------------------------------
       - name: Flutter doctor
         run: flutter doctor -v
 
 
       # --------------------------------------------------
-      # 4. Flutter Version
+      # 5. Flutter Version
       # --------------------------------------------------
       - name: Flutter version
         run: flutter --version
 
 
       # --------------------------------------------------
-      # 5. Get Dependencies
+      # 6. Get Dependencies
       # --------------------------------------------------
       - name: Get dependencies
         run: flutter pub get
 
 
       # --------------------------------------------------
-      # 6. Import Apple Distribution Certificate
+      # 7. Import Apple Distribution Certificate
       # --------------------------------------------------
       - name: Import Apple Distribution Certificate
         uses: Apple-Actions/import-codesign-certs@v7
@@ -63,7 +89,7 @@ jobs:
 
 
       # --------------------------------------------------
-      # 7. Download App Store Provisioning Profile
+      # 8. Download App Store Provisioning Profile
       # --------------------------------------------------
       - name: Download Provisioning Profile
         uses: Apple-Actions/download-provisioning-profiles@v6
@@ -76,7 +102,7 @@ jobs:
 
 
       # --------------------------------------------------
-      # 8. Prepare Flutter iOS Build
+      # 9. Prepare Flutter iOS Build
       # --------------------------------------------------
       - name: Prepare Flutter iOS build
         run: |
@@ -167,7 +193,7 @@ jobs:
 
 
       # --------------------------------------------------
-      # 9. Create ExportOptions.plist
+      # 10. Create ExportOptions.plist
       # --------------------------------------------------
       - name: Create ExportOptions.plist
         run: |
@@ -214,7 +240,7 @@ jobs:
 
 
       # --------------------------------------------------
-      # 10. Archive iOS App
+      # 11. Archive iOS App
       # --------------------------------------------------
       - name: Archive iOS App
         run: |
@@ -232,7 +258,7 @@ jobs:
 
 
       # --------------------------------------------------
-      # 11. Export IPA
+      # 12. Export IPA
       # --------------------------------------------------
       - name: Export IPA
         run: |
@@ -250,7 +276,7 @@ jobs:
 
 
       # --------------------------------------------------
-      # 12. Find and Validate IPA
+      # 13. Find and Validate IPA
       # --------------------------------------------------
       - name: Check IPA
         id: ipa
@@ -300,7 +326,7 @@ jobs:
 
 
       # --------------------------------------------------
-      # 13. Upload to TestFlight
+      # 14. Upload to TestFlight
       # --------------------------------------------------
       - name: Upload to TestFlight
         uses: Apple-Actions/upload-testflight-build@v5
@@ -312,7 +338,7 @@ jobs:
 
 
       # --------------------------------------------------
-      # 14. Upload IPA Artifact
+      # 15. Upload IPA Artifact
       # --------------------------------------------------
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
