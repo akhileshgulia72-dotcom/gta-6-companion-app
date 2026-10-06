@@ -12,14 +12,16 @@ jobs:
     timeout-minutes: 40
 
     steps:
+
       # --------------------------------------------------
       # 1. Checkout
       # --------------------------------------------------
       - name: Checkout
         uses: actions/checkout@v4
 
+
       # --------------------------------------------------
-      # 2. Flutter
+      # 2. Setup Flutter
       # --------------------------------------------------
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -28,23 +30,30 @@ jobs:
           channel: stable
           cache: true
 
+
       # --------------------------------------------------
-      # 3. Flutter information
+      # 3. Flutter Doctor
       # --------------------------------------------------
       - name: Flutter doctor
         run: flutter doctor -v
 
+
+      # --------------------------------------------------
+      # 4. Flutter Version
+      # --------------------------------------------------
       - name: Flutter version
         run: flutter --version
 
+
       # --------------------------------------------------
-      # 4. Get dependencies
+      # 5. Get Dependencies
       # --------------------------------------------------
       - name: Get dependencies
         run: flutter pub get
 
+
       # --------------------------------------------------
-      # 5. Import Apple Distribution Certificate
+      # 6. Import Apple Distribution Certificate
       # --------------------------------------------------
       - name: Import Apple Distribution Certificate
         uses: Apple-Actions/import-codesign-certs@v7
@@ -52,8 +61,9 @@ jobs:
           p12-file-base64: ${{ secrets.APPLE_DISTRIBUTION_P12 }}
           p12-password: ${{ secrets.APPLE_DISTRIBUTION_PASSWORD }}
 
+
       # --------------------------------------------------
-      # 6. Download App Store provisioning profile
+      # 7. Download App Store Provisioning Profile
       # --------------------------------------------------
       - name: Download Provisioning Profile
         uses: Apple-Actions/download-provisioning-profiles@v6
@@ -64,8 +74,9 @@ jobs:
           api-key-id: ${{ vars.APPSTORE_API_KEY_ID }}
           api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
 
+
       # --------------------------------------------------
-      # 7. Prepare Flutter iOS build
+      # 8. Prepare Flutter iOS Build
       # --------------------------------------------------
       - name: Prepare Flutter iOS build
         run: |
@@ -76,6 +87,7 @@ jobs:
           flutter clean
 
           echo "Removing generated Flutter ephemeral files..."
+
           rm -rf ios/Flutter/ephemeral
 
           echo "========================================"
@@ -95,14 +107,23 @@ jobs:
           echo "========================================"
 
           if [ -f ios/Flutter/ephemeral/Packages/FlutterGeneratedPluginSwiftPackage/Package.swift ]; then
+
             echo "FlutterGeneratedPluginSwiftPackage found."
+
             echo ""
             echo "----- Package.swift -----"
-            head -80 ios/Flutter/ephemeral/Packages/FlutterGeneratedPluginSwiftPackage/Package.swift
+
+            head -80 \
+              ios/Flutter/ephemeral/Packages/FlutterGeneratedPluginSwiftPackage/Package.swift
+
             echo "----- End Package.swift -----"
+
           else
+
             echo "ERROR: FlutterGeneratedPluginSwiftPackage was not generated."
+
             exit 1
+
           fi
 
           echo "========================================"
@@ -110,18 +131,29 @@ jobs:
           echo "========================================"
 
           if [ -f ios/Runner.xcodeproj/project.pbxproj ]; then
+
             echo "project.pbxproj exists."
 
+            echo ""
             echo "Runner target ID occurrences:"
-            grep -c "97C146ED1CF9000F007C117D" \
+
+            grep -c \
+              "97C146ED1CF9000F007C117D" \
               ios/Runner.xcodeproj/project.pbxproj || true
 
+            echo ""
             echo "FlutterGeneratedPluginSwiftPackage occurrences:"
-            grep -c "FlutterGeneratedPluginSwiftPackage" \
+
+            grep -c \
+              "FlutterGeneratedPluginSwiftPackage" \
               ios/Runner.xcodeproj/project.pbxproj || true
+
           else
+
             echo "ERROR: project.pbxproj not found."
+
             exit 1
+
           fi
 
           echo "========================================"
@@ -133,8 +165,9 @@ jobs:
             --no-codesign \
             --build-number=${{ github.run_number }}
 
+
       # --------------------------------------------------
-      # 8. Create ExportOptions.plist
+      # 9. Create ExportOptions.plist
       # --------------------------------------------------
       - name: Create ExportOptions.plist
         run: |
@@ -142,6 +175,7 @@ jobs:
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
           "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+
           <plist version="1.0">
           <dict>
 
@@ -178,11 +212,16 @@ jobs:
 
           echo "ExportOptions.plist created."
 
+
       # --------------------------------------------------
-      # 9. Archive iOS App
+      # 10. Archive iOS App
       # --------------------------------------------------
       - name: Archive iOS App
         run: |
+          echo "========================================"
+          echo "Archiving iOS application"
+          echo "========================================"
+
           xcodebuild \
             -workspace ios/Runner.xcworkspace \
             -scheme Runner \
@@ -191,11 +230,16 @@ jobs:
             -archivePath "$PWD/build/ios/Runner.xcarchive" \
             archive
 
+
       # --------------------------------------------------
-      # 10. Export IPA
+      # 11. Export IPA
       # --------------------------------------------------
       - name: Export IPA
         run: |
+          echo "========================================"
+          echo "Exporting IPA"
+          echo "========================================"
+
           mkdir -p build/ios/ipa
 
           xcodebuild \
@@ -204,37 +248,71 @@ jobs:
             -exportOptionsPlist "$PWD/ios/ExportOptions.plist" \
             -exportPath "$PWD/build/ios/ipa"
 
+
       # --------------------------------------------------
-      # 11. Check IPA
+      # 12. Find and Validate IPA
       # --------------------------------------------------
       - name: Check IPA
+        id: ipa
+        shell: bash
         run: |
-          echo "Generated IPA files:"
-          find build/ios/ipa -name "*.ipa" -print
 
-          IPA_FILE=$(find build/ios/ipa -name "*.ipa" -print -quit)
+          echo "========================================"
+          echo "Searching for generated IPA"
+          echo "========================================"
+
+          find "$GITHUB_WORKSPACE/build/ios/ipa" \
+            -type f \
+            -name "*.ipa" \
+            -print
+
+          IPA_FILE=$(find \
+            "$GITHUB_WORKSPACE/build/ios/ipa" \
+            -type f \
+            -name "*.ipa" \
+            -print \
+            -quit)
 
           if [ -z "$IPA_FILE" ]; then
+
             echo "ERROR: No IPA was generated."
+
             exit 1
+
           fi
 
-          echo "IPA successfully generated:"
+          echo ""
+          echo "========================================"
+          echo "IPA successfully generated"
+          echo "========================================"
+
           echo "$IPA_FILE"
 
+          echo ""
+          echo "IPA file information:"
+
+          ls -lh "$IPA_FILE"
+
+          echo ""
+          echo "Saving exact IPA path for TestFlight..."
+
+          echo "ipa_path=$IPA_FILE" >> "$GITHUB_OUTPUT"
+
+
       # --------------------------------------------------
-      # 12. Upload to TestFlight
+      # 13. Upload to TestFlight
       # --------------------------------------------------
       - name: Upload to TestFlight
         uses: Apple-Actions/upload-testflight-build@v5
         with:
-          app-path: build/ios/ipa/*.ipa
+          app-path: ${{ steps.ipa.outputs.ipa_path }}
           issuer-id: ${{ vars.APPSTORE_ISSUER_ID }}
           api-key-id: ${{ vars.APPSTORE_API_KEY_ID }}
           api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
 
+
       # --------------------------------------------------
-      # 13. Upload IPA artifact
+      # 14. Upload IPA Artifact
       # --------------------------------------------------
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
