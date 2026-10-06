@@ -1,4 +1,4 @@
-name: iOS Build (Unsigned)
+name: iOS Build and TestFlight
 
 on:
   workflow_dispatch:
@@ -9,11 +9,14 @@ on:
 jobs:
   ios-build:
     runs-on: macos-15
+    timeout-minutes: 40
 
     steps:
+      # 1. Get your Flutter project
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 2. Install Flutter
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -21,18 +24,134 @@ jobs:
           channel: stable
           cache: true
 
+      # 3. Check Flutter
       - name: Flutter doctor
         run: flutter doctor -v
 
+      # 4. Get packages
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Build iOS
-        run: flutter build ios --release --no-codesign
+      # 5. Import Apple Distribution certificate
+      - name: Import Apple Distribution Certificate
+        uses: Apple-Actions/import-codesign-certs@v7
+        with:
+          p12-file-base64: ${{ secrets.APPLE_DISTRIBUTION_P12 }}
+          p12-password: ${{ secrets.APPLE_DISTRIBUTION_PASSWORD }}
 
-      - name: Upload iOS build
+      # 6. Install provisioning profile
+      - name: Install Provisioning Profile
+        shell: bash
+        run: |
+          echo "${{ secrets.APPLE_PROVISIONING_PROFILE }}" | base64 --decode > profile.mobileprovision
+
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+
+          PROFILE_UUID=$(
+            security cms -D -i profile.mobileprovision |
+            /usr/libexec/PlistBuddy -c "Print :UUID"
+          )
+
+          cp profile.mobileprovision \
+            "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+
+          echo "Installed provisioning profile:"
+          echo "$PROFILE_UUID"
+
+      # 7. Create iOS files without signing
+      - name: Prepare Flutter iOS build
+        run: |
+          flutter clean
+          flutter pub get
+
+          flutter build ios \
+            --release \
+            --no-codesign \
+            --build-number=${{ github.run_number }}
+
+      # 8. Create ExportOptions.plist
+      - name: Create ExportOptions.plist
+        run: |
+          cat > ios/ExportOptions.plist <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+          "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store</string>
+
+              <key>teamID</key>
+              <string>PR4R9G4HZ3</string>
+
+              <key>signingStyle</key>
+              <string>manual</string>
+
+              <key>signingCertificate</key>
+              <string>Apple Distribution</string>
+
+              <key>provisioningProfiles</key>
+              <dict>
+                  <key>com.akhileshgulia.gta6companion</key>
+                  <string>GTA6 Companion App Store</string>
+              </dict>
+
+              <key>stripSwiftSymbols</key>
+              <true/>
+
+              <key>uploadSymbols</key>
+              <true/>
+
+              <key>compileBitcode</key>
+              <false/>
+          </dict>
+          </plist>
+          EOF
+
+      # 9. Create signed archive
+      - name: Archive iOS App
+        run: |
+          xcodebuild \
+            -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath "$PWD/build/ios/Runner.xcarchive" \
+            DEVELOPMENT_TEAM=PR4R9G4HZ3 \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="GTA6 Companion App Store" \
+            archive
+
+      # 10. Export signed IPA
+      - name: Export IPA
+        run: |
+          mkdir -p build/ios/ipa
+
+          xcodebuild \
+            -exportArchive \
+            -archivePath "$PWD/build/ios/Runner.xcarchive" \
+            -exportOptionsPlist "$PWD/ios/ExportOptions.plist" \
+            -exportPath "$PWD/build/ios/ipa"
+
+      # 11. Show generated IPA
+      - name: Check IPA
+        run: |
+          echo "Generated IPA:"
+          find build/ios/ipa -name "*.ipa" -print
+
+      # 12. Upload IPA to TestFlight
+      - name: Upload to TestFlight
+        uses: Apple-Actions/upload-testflight-build@v5
+        with:
+          app-path: build/ios/ipa/*.ipa
+          issuer-id: ${{ vars.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ vars.APPSTORE_API_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+
+      # 13. Keep IPA as GitHub artifact too
+      - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
-          name: gta6-ios-build
-          path: build/ios/iphoneos/Runner.app
-          if-no-files-found: error
+          name: gta6-ios-ipa
+          path: build/ios/ipa/*.ipa
