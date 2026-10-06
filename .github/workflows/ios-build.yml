@@ -12,11 +12,12 @@ jobs:
     timeout-minutes: 40
 
     steps:
-      # 1. Checkout repository
+
+      # 1. Checkout
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2. Install Flutter
+      # 2. Flutter
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -24,22 +25,22 @@ jobs:
           channel: stable
           cache: true
 
-      # 3. Check Flutter/Xcode environment
+      # 3. Flutter environment
       - name: Flutter doctor
         run: flutter doctor -v
 
-      # 4. Get Flutter dependencies
+      # 4. Dependencies
       - name: Get dependencies
         run: flutter pub get
 
-      # 5. Import Apple Distribution Certificate
+      # 5. Import Apple Distribution certificate
       - name: Import Apple Distribution Certificate
         uses: Apple-Actions/import-codesign-certs@v7
         with:
           p12-file-base64: ${{ secrets.APPLE_DISTRIBUTION_P12 }}
           p12-password: ${{ secrets.APPLE_DISTRIBUTION_PASSWORD }}
 
-      # 6. Download provisioning profile directly from Apple
+      # 6. Download provisioning profile from Apple
       - name: Download Provisioning Profile
         uses: Apple-Actions/download-provisioning-profiles@v6
         with:
@@ -49,7 +50,7 @@ jobs:
           api-key-id: ${{ vars.APPSTORE_API_KEY_ID }}
           api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
 
-      # 7. Clean Flutter project
+      # 7. Clean and prepare Flutter
       - name: Prepare Flutter iOS build
         run: |
           flutter clean
@@ -101,7 +102,7 @@ jobs:
           </plist>
           EOF
 
-      # 9. Create signed Xcode archive
+      # 9. Archive
       - name: Archive iOS App
         run: |
           xcodebuild \
@@ -111,9 +112,7 @@ jobs:
             -sdk iphoneos \
             -archivePath "$PWD/build/ios/Runner.xcarchive" \
             DEVELOPMENT_TEAM=PR4R9G4HZ3 \
-            CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution" \
-            PROVISIONING_PROFILE_SPECIFIER="GTA6 Companion App Store" \
             archive
 
       # 10. Export IPA
@@ -127,13 +126,13 @@ jobs:
             -exportOptionsPlist "$PWD/ios/ExportOptions.plist" \
             -exportPath "$PWD/build/ios/ipa"
 
-      # 11. Check generated IPA
+      # 11. Verify IPA
       - name: Check IPA
         run: |
           echo "Generated IPA:"
           find build/ios/ipa -name "*.ipa" -print
 
-      # 12. Upload IPA to TestFlight
+      # 12. Upload to TestFlight
       - name: Upload to TestFlight
         uses: Apple-Actions/upload-testflight-build@v5
         with:
@@ -142,7 +141,7 @@ jobs:
           api-key-id: ${{ vars.APPSTORE_API_KEY_ID }}
           api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
 
-      # 13. Save IPA as GitHub artifact
+      # 13. Save IPA artifact
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
